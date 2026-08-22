@@ -122,7 +122,7 @@
 
 <main>
   <section class="hero">
-    <div class="pitch-lines" aria-hidden="true"></div>
+    <div class="pitch-lines" aria-hidden="true"><span class="penalty-area left"></span><span class="penalty-area right"></span></div>
     <div class="hero-inner">
       <div class="hero-copy">
         <span class="kicker">Streaming-Pakete im Preis-Check</span>
@@ -298,8 +298,17 @@
   .chat-link { display: flex; align-items: center; gap: .45rem; padding: .65rem .9rem; border: 1px solid #bfd6e9; border-radius: 9px; background: #fff; color: #075b9f; font-size: .82rem; font-weight: 800; cursor: pointer; }
   .chat-link span { color: #f5a000; font-size: 1.15rem; }
   .hero { position: relative; overflow: hidden; min-height: 34rem; background: linear-gradient(125deg, #052f63 0%, #064984 62%, #0874be 100%); }
-  .hero::after { position: absolute; right: -9rem; bottom: -15rem; width: 34rem; height: 34rem; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; content: ''; }
-  .pitch-lines { position: absolute; inset: 0; opacity: .18; background-image: linear-gradient(90deg, transparent 49.9%, rgba(255,255,255,.18) 50%, transparent 50.1%), radial-gradient(circle at 50% 50%, transparent 0 70px, rgba(255,255,255,.2) 71px 72px, transparent 73px); }
+  .pitch-lines { position: absolute; inset: 1.4rem 2rem; border: 1px solid rgba(255,255,255,.13); border-radius: 5px; background-image: radial-gradient(circle at 50% 50%, transparent 0 64px, rgba(255,255,255,.16) 65px 66px, transparent 67px), radial-gradient(circle at 50% 50%, rgba(255,255,255,.22) 0 2px, transparent 3px); }
+  .pitch-lines::before { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px solid rgba(255,255,255,.16); content: ''; }
+  .penalty-area { position: absolute; top: 24%; width: 12%; height: 52%; border: 1px solid rgba(255,255,255,.14); }
+  .penalty-area.left { left: -1px; border-left: 0; }
+  .penalty-area.right { right: -1px; border-right: 0; }
+  .penalty-area::before { position: absolute; top: 25%; width: 44%; height: 50%; border: 1px solid rgba(255,255,255,.14); content: ''; }
+  .penalty-area.left::before { left: 0; border-left: 0; }
+  .penalty-area.right::before { right: 0; border-right: 0; }
+  .penalty-area::after { position: absolute; top: 31%; width: 2.6rem; height: 38%; border: 1px solid rgba(255,255,255,.14); border-radius: 50%; content: ''; }
+  .penalty-area.left::after { right: -1.65rem; clip-path: inset(-2px -2px -2px 62%); }
+  .penalty-area.right::after { left: -1.65rem; clip-path: inset(-2px 62% -2px -2px); }
   .hero-inner { position: relative; z-index: 2; display: grid; max-width: 1400px; margin: auto; padding: 4.5rem 2rem 4rem; grid-template-columns: minmax(0, 1fr) minmax(30rem, 34rem); gap: clamp(3rem, 7vw, 8rem); align-items: center; }
   .kicker { display: inline-block; color: #78c9ff; font-size: .74rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
   .hero h1 { max-width: 39rem; margin: .7rem 0 1.2rem; color: #fff; font-size: clamp(2.8rem, 5vw, 4.7rem); line-height: .98; letter-spacing: -.055em; }
@@ -446,6 +455,7 @@
     nav { display: none; }
     .chat-link { margin-left: auto; }
     .hero-inner { padding: 3rem 1rem; }
+    .pitch-lines { inset: .75rem; }
     .hero h1 { font-size: clamp(2.5rem, 12vw, 3.6rem); }
     .process { display: none; }
     .results { padding: 3.5rem 1rem; }
