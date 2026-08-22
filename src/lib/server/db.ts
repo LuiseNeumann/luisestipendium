@@ -187,10 +187,19 @@ export function getGamesForTeams(teams: string[], startDate?: string, endDate?: 
 }
 
 export function listTournaments(): string[] {
+  return getTournamentRanges().map((tournament) => tournament.name);
+}
+
+export function getTournamentRanges(): Array<{ name: string; start: string; end: string }> {
   const rows = getDb()
-    .prepare('SELECT DISTINCT tournament_name AS name FROM games ORDER BY tournament_name COLLATE NOCASE')
-    .all() as Array<{ name: string }>;
-  return rows.map((row) => row.name);
+    .prepare(`
+      SELECT tournament_name AS name, MIN(starts_at) AS start, MAX(starts_at) AS end
+      FROM games
+      GROUP BY tournament_name
+      ORDER BY tournament_name COLLATE NOCASE
+    `)
+    .all() as Array<{ name: string; start: string; end: string }>;
+  return rows.map((row) => ({ name: row.name, start: row.start.slice(0, 10), end: row.end.slice(0, 10) }));
 }
 
 export function tournamentExists(tournament: string): boolean {

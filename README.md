@@ -26,7 +26,7 @@ Danach ist Streaming Check unter `http://localhost:3000` erreichbar. Die automat
 
 - Suche und Mehrfachauswahl aus 941 Mannschaften
 - Frei wählbarer Datumsbereich für Live-Spiele
-- Optionaler Turnierfilter zusätzlich zum Datumsbereich
+- Optionaler Turnierfilter, der den Datumsbereich automatisch auf die vorhandenen Turnierspiele setzt
 - Bereits vorhandene Abos werden als 0,00 € Zusatzkosten berücksichtigt
 - Kostenlose Angebote von ARD, ZDF und weiteren Anbietern separat ausgewiesen
 - Exakte binäre Set-Cover-Optimierung über GLPK

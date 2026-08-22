@@ -8,13 +8,15 @@
 
   let teams: string[] = [];
   let packages: StreamingPackage[] = [];
-  let tournaments: string[] = [];
+  let tournaments: Array<{ name: string; start: string; end: string }> = [];
   let tournament = '';
   let existingPackageIds: number[] = [];
   let packageToAdd = '';
   let dateBounds = { start: '', end: '' };
   let startDate = '';
   let endDate = '';
+  let startDateInput: HTMLInputElement;
+  let endDateInput: HTMLInputElement;
   let result: OptimizationResult | null = null;
   let loading = false;
   let errorMessage = '';
@@ -29,7 +31,7 @@
     const data = (await response.json()) as {
       packages: StreamingPackage[];
       dateBounds: { start: string; end: string };
-      tournaments: string[];
+      tournaments: Array<{ name: string; start: string; end: string }>;
     };
     packages = data.packages;
     tournaments = data.tournaments;
@@ -64,6 +66,20 @@
 
   function packageName(packageId: number) {
     return packages.find((item) => item.id === packageId)?.name ?? `Paket ${packageId}`;
+  }
+
+  function changeTournament() {
+    const selected = tournaments.find((item) => item.name === tournament);
+    if (selected) {
+      startDate = selected.start;
+      endDate = selected.end;
+    }
+    result = null;
+  }
+
+  function openDatePicker(input: HTMLInputElement) {
+    if (typeof input.showPicker === 'function') input.showPicker();
+    else input.focus();
   }
 
   async function optimize() {
@@ -122,16 +138,16 @@
         <fieldset class="date-fieldset">
           <legend>Zeitraum für Live-Spiele</legend>
           <div class="date-grid">
-            <label>Von<input type="date" bind:value={startDate} min={dateBounds.start} max={endDate || dateBounds.end} onchange={() => (result = null)} /></label>
-            <label>Bis<input type="date" bind:value={endDate} min={startDate || dateBounds.start} max={dateBounds.end} onchange={() => (result = null)} /></label>
+            <label>Von<span class="date-input"><input bind:this={startDateInput} type="date" bind:value={startDate} min={dateBounds.start} max={endDate || dateBounds.end} onchange={() => (result = null)} /><button type="button" onclick={() => openDatePicker(startDateInput)} aria-label="Kalender für Startdatum öffnen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 8h2m4 0h2m-8 4h2m4 0h2" /></svg></button></span></label>
+            <label>Bis<span class="date-input"><input bind:this={endDateInput} type="date" bind:value={endDate} min={startDate || dateBounds.start} max={dateBounds.end} onchange={() => (result = null)} /><button type="button" onclick={() => openDatePicker(endDateInput)} aria-label="Kalender für Enddatum öffnen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 8h2m4 0h2m-8 4h2m4 0h2" /></svg></button></span></label>
           </div>
         </fieldset>
 
         <fieldset class="tournament-fieldset">
           <legend>Turnier</legend>
-          <select bind:value={tournament} onchange={() => (result = null)} aria-label="Turnier auswählen">
+          <select bind:value={tournament} onchange={changeTournament} aria-label="Turnier auswählen">
             <option value="">Alle Turniere</option>
-            {#each tournaments as item}<option value={item}>{item}</option>{/each}
+            {#each tournaments as item}<option value={item.name}>{item.name}</option>{/each}
           </select>
         </fieldset>
 
@@ -303,6 +319,13 @@
   .date-grid label { color: #627d98; font-size: .68rem; font-weight: 700; }
   .date-grid input, .package-select select, .tournament-fieldset select { display: block; width: 100%; min-height: 2.8rem; margin-top: .25rem; padding: .55rem .65rem; border: 1px solid #cbd9e8; border-radius: 9px; background: #fff; color: #243b53; font: inherit; font-size: .78rem; outline: none; }
   .date-grid input:focus, .package-select select:focus, .tournament-fieldset select:focus { border-color: #0874d1; box-shadow: 0 0 0 3px rgba(8,116,209,.1); }
+  .date-input { position: relative; display: block; margin-top: .25rem; }
+  .date-input input { margin-top: 0; padding-right: 2.8rem; appearance: none; -webkit-appearance: none; -moz-appearance: textfield; }
+  .date-input input::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
+  .date-input button { position: absolute; top: 1px; right: 1px; display: grid; width: 2.6rem; height: calc(100% - 2px); place-items: center; border: 0; border-left: 1px solid #dce7f2; border-radius: 0 8px 8px 0; background: #f4f8fc; color: #0874d1; cursor: pointer; }
+  .date-input button:hover { background: #e8f4ff; }
+  .date-input button:focus-visible { outline: 2px solid #0874d1; outline-offset: 1px; }
+  .date-input svg { width: 1.15rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
   .tournament-fieldset select { margin-top: 0; }
   .package-select { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
   .package-select select { margin: 0; min-width: 0; }
