@@ -7,7 +7,11 @@ export function GET({ url }) {
   if (teams.length > 8) error(400, 'Maximal acht Mannschaften sind erlaubt.');
   if (!teamsExist(teams)) error(400, 'Mindestens eine Mannschaft ist im Datensatz nicht vorhanden.');
 
-  const games = getGamesForTeams([...new Set(teams)]);
+  const startDate = url.searchParams.get('start') ?? undefined;
+  const endDate = url.searchParams.get('end') ?? undefined;
+  const tournament = url.searchParams.get('tournament') ?? undefined;
+
+  const games = getGamesForTeams([...new Set(teams)], startDate, endDate, tournament);
   const offers = getOffers(games.map((game) => game.id));
   const packages = getPackages();
   return json({ games, offers, packages });

@@ -153,17 +153,24 @@ export function teamsExist(teams: string[]): boolean {
   return teams.every((team) => available.has(team));
 }
 
-export function getGamesForTeams(teams: string[]): Game[] {
+export function getGamesForTeams(teams: string[], startDate?: string, endDate?: string, tournament?: string): Game[] {
   if (teams.length === 0) return [];
   const placeholders = teams.map(() => '?').join(', ');
+  const dateFilter = startDate && endDate ? 'AND starts_at >= ? AND starts_at <= ?' : '';
+  const tournamentFilter = tournament ? 'AND tournament_name = ?' : '';
+  const parameters: Array<string> = [...teams, ...teams];
+  if (startDate && endDate) parameters.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
+  if (tournament) parameters.push(tournament);
   const rows = getDb()
     .prepare(`
       SELECT id, team_home, team_away, starts_at, tournament_name
       FROM games
-      WHERE team_home IN (${placeholders}) OR team_away IN (${placeholders})
+      WHERE (team_home IN (${placeholders}) OR team_away IN (${placeholders}))
+      ${dateFilter}
+      ${tournamentFilter}
       ORDER BY starts_at, id
     `)
-    .all(...teams, ...teams) as Array<{
+    .all(...parameters) as Array<{
     id: number;
     team_home: string;
     team_away: string;
@@ -177,6 +184,29 @@ export function getGamesForTeams(teams: string[]): Game[] {
     startsAt: row.starts_at,
     tournament: row.tournament_name
   }));
+}
+
+export function listTournaments(): string[] {
+  const rows = getDb()
+    .prepare('SELECT DISTINCT tournament_name AS name FROM games ORDER BY tournament_name COLLATE NOCASE')
+    .all() as Array<{ name: string }>;
+  return rows.map((row) => row.name);
+}
+
+export function tournamentExists(tournament: string): boolean {
+  return listTournaments().includes(tournament);
+}
+
+export function getDataBounds(): { start: string; end: string } {
+  const row = getDb()
+    .prepare('SELECT MIN(starts_at) AS start, MAX(starts_at) AS end FROM games')
+    .get() as { start: string; end: string };
+  return { start: row.start.slice(0, 10), end: row.end.slice(0, 10) };
+}
+
+export function packagesExist(packageIds: number[]): boolean {
+  const available = new Set(getPackages().map((item) => item.id));
+  return packageIds.every((id) => available.has(id));
 }
 
 export function getPackages(): StreamingPackage[] {

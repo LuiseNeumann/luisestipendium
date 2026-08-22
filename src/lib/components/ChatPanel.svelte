@@ -1,9 +1,10 @@
 <script lang="ts">
-  import type { CoverageMode } from '$lib/types';
-
   export let open = false;
   export let teams: string[] = [];
-  export let coverageMode: CoverageMode = 'live';
+  export let startDate: string;
+  export let endDate: string;
+  export let tournament = '';
+  export let existingPackageIds: number[] = [];
   export let onclose: () => void;
   export let onteams: (teams: string[]) => void;
 
@@ -22,7 +23,7 @@
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message, teams, coverageMode })
+        body: JSON.stringify({ message, teams, startDate, endDate, tournament, existingPackageIds })
       });
       const data = (await response.json()) as {
         answer?: string;
@@ -49,10 +50,10 @@
 </script>
 
 {#if open}<button class="backdrop" aria-label="Chat schließen" onclick={onclose}></button>{/if}
-<aside class:open aria-hidden={!open} aria-label="Streaming-Sparberater">
+<aside class:open aria-hidden={!open} aria-label="Streaming-Berater">
   <header>
     <div class="avatar">S</div>
-    <div><strong>Sparberater</strong><span><i></i> Datenbasiert online</span></div>
+    <div><strong>Streaming-Berater</strong><span><i></i> Datenbasiert online</span></div>
     <button type="button" onclick={onclose} aria-label="Chat schließen">×</button>
   </header>
   <div class="messages" aria-live="polite">

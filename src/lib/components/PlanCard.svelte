@@ -5,11 +5,20 @@
   export let option: OptimizationOption;
   export let recommended = false;
   export let gameById: Map<number, Game>;
+  let expandedPackages = new Set<string>();
 
   const labels = {
     annual: { eyebrow: 'Einmal entscheiden', title: 'Jahresabos', description: '12 Monate planbar und ohne Buchungspausen' },
-    staggered: { eyebrow: 'Nur wenn gespielt wird', title: 'Monatsweise', description: 'Flexible Pakete nur in aktiven Monaten' }
+    staggered: { eyebrow: 'Nur wenn gespielt wird', title: 'Zeitoptimiert', description: 'Monatstarife nur in aktiven Monaten, Jahresverträge nur wenn nötig' },
+    alternative: { eyebrow: 'Weitere Möglichkeit', title: 'Alternative', description: 'Andere Anbieter bei vollständiger Live-Abdeckung' }
   } as const;
+
+  function toggleGames(key: string) {
+    const next = new Set(expandedPackages);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    expandedPackages = next;
+  }
 </script>
 
 <article class:recommended>
@@ -32,31 +41,41 @@
       <p class="empty">Keine Pakete erforderlich.</p>
     {:else}
       {#each option.packages as item}
+        {@const packageKey = `${item.packageId}-${item.billingPeriod}`}
         <details>
           <summary>
             <span class="package-icon">▶</span>
             <span class="package-name"><strong>{item.name}</strong><small>{item.coveredGameIds.length} Spiele</small></span>
-            <span class="package-price">{formatEuro(item.costCents)}</span>
+            <span class="package-price">{formatEuro(item.costCents)}<small>Zusatzkosten</small></span>
             <span class="chevron">⌄</span>
           </summary>
           <div class="explanation">
             <div class="booking">
-              {#if item.billingPeriod === 'annual'}
-                <span>{item.bookingCount > 1 ? `${item.bookingCount} × ` : ''}12 Monate Bindung</span>
+              {#if item.alreadyOwned}
+                <span>Bereits vorhanden</span> · für den gewählten Zeitraum mit 0,00 € Zusatzkosten berücksichtigt
+              {:else if item.monthlyRateCents === 0}
+                <span>Kostenlos verfügbar</span> · kein Abo-Preis
+              {:else if item.billingPeriod === 'annual'}
+                <span>{formatEuro(item.monthlyRateCents)} pro Monat × 12 Monate{item.bookingCount > 1 ? ` × ${item.bookingCount} Verträge` : ''}</span>
+                = {formatEuro(item.costCents)}
               {:else}
-                <span>{item.bookedMonths.length} {item.bookedMonths.length === 1 ? 'Buchungsmonat' : 'Buchungsmonate'}:</span>
-                {item.bookedMonths.map(formatMonth).join(', ')}
+                <span>{formatEuro(item.monthlyRateCents)} × {item.bookedMonths.length} {item.bookedMonths.length === 1 ? 'Monat' : 'Monate'}</span>
+                = {formatEuro(item.costCents)} · {item.bookedMonths.map(formatMonth).join(', ')}
               {/if}
             </div>
             <ul>
-              {#each item.coveredGameIds.slice(0, 8) as gameId}
+              {#each (expandedPackages.has(packageKey) ? item.coveredGameIds : item.coveredGameIds.slice(0, 8)) as gameId}
                 {@const game = gameById.get(gameId)}
                 {#if game}
                   <li><span>{game.homeTeam} – {game.awayTeam}</span><time>{formatDate(game.startsAt)}</time></li>
                 {/if}
               {/each}
             </ul>
-            {#if item.coveredGameIds.length > 8}<p class="more">+ {item.coveredGameIds.length - 8} weitere Spiele</p>{/if}
+            {#if item.coveredGameIds.length > 8}
+              <button class="more" type="button" onclick={() => toggleGames(packageKey)}>
+                {expandedPackages.has(packageKey) ? 'Weniger Spiele anzeigen' : `+ ${item.coveredGameIds.length - 8} weitere Spiele anzeigen`}
+              </button>
+            {/if}
           </div>
         </details>
       {/each}
@@ -89,7 +108,8 @@
   .package-name strong, .package-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .package-name strong { color: #243b53; font-size: .88rem; }
   .package-name small { margin-top: .15rem; color: #829ab1; font-size: .72rem; }
-  .package-price { color: #243b53; font-size: .88rem; font-weight: 800; }
+  .package-price { color: #243b53; font-size: .88rem; font-weight: 800; text-align: right; }
+  .package-price small { display: block; margin-top: .12rem; color: #829ab1; font-size: .58rem; font-weight: 500; }
   .chevron { color: #829ab1; transition: transform .2s; }
   details[open] .chevron { transform: rotate(180deg); }
   .explanation { padding: .2rem 1.45rem 1rem 4rem; background: #fbfdff; }
@@ -98,7 +118,8 @@
   ul { margin: 0; padding: 0; list-style: none; }
   li { display: flex; justify-content: space-between; gap: 1rem; padding: .42rem 0; border-top: 1px dashed #e3ebf3; color: #486581; font-size: .73rem; }
   time { flex: 0 0 auto; color: #829ab1; }
-  .more { margin: .5rem 0 0; color: #0874d1; font-size: .73rem; font-weight: 700; }
+  .more { margin: .6rem 0 0; padding: 0; border: 0; background: transparent; color: #0874d1; font-size: .73rem; font-weight: 800; cursor: pointer; }
+  .more:hover { text-decoration: underline; }
   .empty { padding: 1rem 1.45rem; color: #627d98; }
   @media (max-width: 520px) {
     header { align-items: flex-start; padding: 1.2rem 1rem .85rem; }

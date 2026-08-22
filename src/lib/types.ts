@@ -31,29 +31,41 @@ export interface PackageSelection {
   packageId: number;
   name: string;
   costCents: number;
-  billingPeriod: 'monthly' | 'annual';
+  monthlyRateCents: number;
+  billingPeriod: 'monthly' | 'annual' | 'existing';
+  alreadyOwned: boolean;
   bookingCount: number;
   bookedMonths: string[];
   coveredGameIds: number[];
 }
 
 export interface OptimizationOption {
-  kind: 'annual' | 'staggered';
+  kind: 'annual' | 'staggered' | 'alternative';
   totalCostCents: number;
   packages: PackageSelection[];
   coveredGameCount: number;
   optimal: boolean;
 }
 
+export interface FreeTvCoverage {
+  packageId: number;
+  name: string;
+  coveredGameIds: number[];
+}
+
 export interface OptimizationResult {
   teams: string[];
-  coverageMode: CoverageMode;
+  dateRange: { start: string; end: string };
+  tournament: string | null;
+  existingPackageIds: number[];
   games: Game[];
   unavailableGameIds: number[];
   annual: OptimizationOption;
   staggered: OptimizationOption;
   recommended: 'annual' | 'staggered';
-  naiveCostCents: number;
+  alternatives: OptimizationOption[];
+  freeTv: FreeTvCoverage[];
+  referenceCostCents: number;
   savingsCents: number;
   savingsPercent: number;
   savingsScore: number;

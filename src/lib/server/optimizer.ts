@@ -1,6 +1,5 @@
 import GLPK, { type GLPK as GlpkInstance, type LP } from 'glpk.js/node';
 import type {
-  CoverageMode,
   Game,
   OptimizationOption,
   OptimizationResult,
@@ -14,7 +13,9 @@ export interface CoverCandidate {
   packageId: number;
   name: string;
   costCents: number;
-  billingPeriod: 'monthly' | 'annual';
+  monthlyRateCents: number;
+  billingPeriod: 'monthly' | 'annual' | 'existing';
+  alreadyOwned: boolean;
   bookedMonths: string[];
   gameIds: number[];
 }
@@ -23,6 +24,14 @@ export interface CoverSolution {
   selected: CoverCandidate[];
   totalCostCents: number;
   optimal: boolean;
+  feasible: boolean;
+}
+
+export interface OptimizeInput {
+  startDate: string;
+  endDate: string;
+  existingPackageIds: number[];
+  tournament?: string;
 }
 
 let glpkPromise: Promise<GlpkInstance> | undefined;
@@ -60,12 +69,13 @@ function greedyCover(gameIds: number[], candidates: CoverCandidate[]): CoverSolu
   return {
     selected,
     totalCostCents: selected.reduce((sum, item) => sum + item.costCents, 0),
-    optimal: false
+    optimal: false,
+    feasible: uncovered.size === 0
   };
 }
 
 export async function solveCover(gameIds: number[], candidates: CoverCandidate[]): Promise<CoverSolution> {
-  if (gameIds.length === 0) return { selected: [], totalCostCents: 0, optimal: true };
+  if (gameIds.length === 0) return { selected: [], totalCostCents: 0, optimal: true, feasible: true };
 
   const usefulCandidates = candidates.filter((candidate) => candidate.gameIds.length > 0);
   if (usefulCandidates.length > 1_000 || gameIds.length > 1_500) {
@@ -99,15 +109,16 @@ export async function solveCover(gameIds: number[], candidates: CoverCandidate[]
   return {
     selected,
     totalCostCents: selected.reduce((sum, item) => sum + item.costCents, 0),
-    optimal: result.result.status === glpk.GLP_OPT
+    optimal: result.result.status === glpk.GLP_OPT,
+    feasible: true
   };
 }
 
-function annualCost(streamingPackage: StreamingPackage): number | undefined {
+function annualCost(streamingPackage: StreamingPackage): { totalCents: number; monthlyRateCents: number } | undefined {
   const annual = streamingPackage.prices.find((price) => price.billingPeriod === 'annual');
   const monthly = streamingPackage.prices.find((price) => price.billingPeriod === 'monthly');
   const price = annual ?? monthly;
-  return price ? price.monthlyPriceCents * 12 : undefined;
+  return price ? { totalCents: price.monthlyPriceCents * 12, monthlyRateCents: price.monthlyPriceCents } : undefined;
 }
 
 function monthIndex(value: string) {
@@ -131,7 +142,9 @@ function aggregateSelections(selected: CoverCandidate[]): PackageSelection[] {
       packageId: candidate.packageId,
       name: candidate.name,
       costCents: 0,
+      monthlyRateCents: candidate.monthlyRateCents,
       billingPeriod: candidate.billingPeriod,
+      alreadyOwned: candidate.alreadyOwned,
       bookingCount: 0,
       bookedMonths: [],
       coveredGameIds: []
@@ -147,7 +160,7 @@ function aggregateSelections(selected: CoverCandidate[]): PackageSelection[] {
   return [...aggregated.values()].sort((a, b) => b.coveredGameIds.length - a.coveredGameIds.length);
 }
 
-function asOption(kind: 'annual' | 'staggered', solution: CoverSolution, gameCount: number): OptimizationOption {
+function asOption(kind: 'annual' | 'staggered' | 'alternative', solution: CoverSolution, gameCount: number): OptimizationOption {
   return {
     kind,
     totalCostCents: solution.totalCostCents,
@@ -157,14 +170,58 @@ function asOption(kind: 'annual' | 'staggered', solution: CoverSolution, gameCou
   };
 }
 
-export async function optimizeForTeams(teams: string[], coverageMode: CoverageMode): Promise<OptimizationResult> {
+function paidPackageKey(solution: CoverSolution) {
+  return [...new Set(solution.selected.filter((item) => item.monthlyRateCents > 0 && !item.alreadyOwned).map((item) => item.packageId))]
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
+async function findAlternatives(
+  gameIds: number[],
+  candidates: CoverCandidate[],
+  primary: CoverSolution,
+  gameCount: number
+): Promise<OptimizationOption[]> {
+  const primaryKey = paidPackageKey(primary);
+  if (!primaryKey) return [];
+
+  const alternatives = new Map<string, OptimizationOption>();
+  const queue = primaryKey.split(',').map((id) => new Set([Number(id)]));
+  const attempted = new Set<string>();
+
+  while (queue.length > 0 && attempted.size < 18 && alternatives.size < 3) {
+    const excluded = queue.shift()!;
+    const exclusionKey = [...excluded].sort((a, b) => a - b).join(',');
+    if (attempted.has(exclusionKey)) continue;
+    attempted.add(exclusionKey);
+
+    const solution = await solveCover(
+      gameIds,
+      candidates.filter((candidate) => !excluded.has(candidate.packageId))
+    );
+    if (!solution.feasible) continue;
+    const key = paidPackageKey(solution);
+    if (key && key !== primaryKey && !alternatives.has(key)) {
+      alternatives.set(key, asOption('alternative', solution, gameCount));
+    }
+    for (const packageId of solution.selected
+      .filter((item) => item.monthlyRateCents > 0 && !item.alreadyOwned)
+      .map((item) => item.packageId)) {
+      queue.push(new Set([...excluded, packageId]));
+    }
+  }
+  return [...alternatives.values()].sort((a, b) => a.totalCostCents - b.totalCostCents).slice(0, 3);
+}
+
+export async function optimizeForTeams(teams: string[], input: OptimizeInput): Promise<OptimizationResult> {
   const startedAt = performance.now();
-  const games = getGamesForTeams(teams);
+  const games = getGamesForTeams(teams, input.startDate, input.endDate, input.tournament);
   const packages = getPackages();
   const packageById = new Map(packages.map((item) => [item.id, item]));
+  const ownedPackages = new Set(input.existingPackageIds);
   const offers = getOffers(
     games.map((game) => game.id),
-    coverageMode
+    'live'
   );
   const gamesByPackage = new Map<number, number[]>();
   for (const offer of offers) {
@@ -185,10 +242,41 @@ export async function optimizeForTeams(teams: string[], coverageMode: CoverageMo
   for (const [packageId, gameIds] of gamesByPackage) {
     const item = packageById.get(packageId);
     if (!item) continue;
-    const costCents = annualCost(item);
-    if (costCents === undefined) continue;
+    const uniqueGameIds = [...new Set(gameIds)];
+    const activeMonths = [...new Set(uniqueGameIds.map((gameId) => gameById.get(gameId)!.startsAt.slice(0, 7)))].sort();
+    if (ownedPackages.has(packageId)) {
+      annualCandidates.push({
+        id: `existing-${packageId}`,
+        packageId,
+        name: item.name,
+        costCents: 0,
+        monthlyRateCents: 0,
+        billingPeriod: 'existing',
+        alreadyOwned: true,
+        bookedMonths: activeMonths,
+        gameIds: uniqueGameIds
+      });
+      continue;
+    }
+    const free = item.prices.some((price) => price.monthlyPriceCents === 0);
+    if (free) {
+      annualCandidates.push({
+        id: `free-${packageId}`,
+        packageId,
+        name: item.name,
+        costCents: 0,
+        monthlyRateCents: 0,
+        billingPeriod: 'monthly',
+        alreadyOwned: false,
+        bookedMonths: activeMonths,
+        gameIds: uniqueGameIds
+      });
+      continue;
+    }
+    const cost = annualCost(item);
+    if (cost === undefined) continue;
     for (let blockStart = firstMonth; blockStart <= lastMonth; blockStart += 12) {
-      const blockGameIds = [...new Set(gameIds)].filter((gameId) => {
+      const blockGameIds = uniqueGameIds.filter((gameId) => {
         const month = monthIndex(gameById.get(gameId)!.startsAt);
         return month >= blockStart && month < blockStart + 12;
       });
@@ -197,8 +285,10 @@ export async function optimizeForTeams(teams: string[], coverageMode: CoverageMo
         id: `annual-${packageId}-${blockStart}`,
         packageId,
         name: item.name,
-        costCents,
+        costCents: cost.totalCents,
+        monthlyRateCents: cost.monthlyRateCents,
         billingPeriod: 'annual',
+        alreadyOwned: false,
         bookedMonths: monthRange(blockStart),
         gameIds: blockGameIds
       });
@@ -210,8 +300,39 @@ export async function optimizeForTeams(teams: string[], coverageMode: CoverageMo
     const item = packageById.get(packageId);
     if (!item) continue;
     const uniqueGameIds = [...new Set(offeredGameIds)];
+    const activeMonths = [...new Set(uniqueGameIds.map((gameId) => gameById.get(gameId)!.startsAt.slice(0, 7)))].sort();
+    if (ownedPackages.has(packageId)) {
+      staggeredCandidates.push({
+        id: `existing-${packageId}`,
+        packageId,
+        name: item.name,
+        costCents: 0,
+        monthlyRateCents: 0,
+        billingPeriod: 'existing',
+        alreadyOwned: true,
+        bookedMonths: activeMonths,
+        gameIds: uniqueGameIds
+      });
+      continue;
+    }
     const annualPrice = item.prices.find((price) => price.billingPeriod === 'annual');
     const monthlyPrice = item.prices.find((price) => price.billingPeriod === 'monthly');
+    const free = item.prices.some((price) => price.monthlyPriceCents === 0);
+
+    if (free) {
+      staggeredCandidates.push({
+        id: `free-${packageId}`,
+        packageId,
+        name: item.name,
+        costCents: 0,
+        monthlyRateCents: 0,
+        billingPeriod: 'monthly',
+        alreadyOwned: false,
+        bookedMonths: activeMonths,
+        gameIds: uniqueGameIds
+      });
+      continue;
+    }
 
     if (annualPrice) {
       const possibleStarts = [...new Set(uniqueGameIds.map((gameId) => monthIndex(gameById.get(gameId)!.startsAt)))];
@@ -225,7 +346,9 @@ export async function optimizeForTeams(teams: string[], coverageMode: CoverageMo
           packageId: item.id,
           name: item.name,
           costCents: annualPrice.monthlyPriceCents * 12,
+          monthlyRateCents: annualPrice.monthlyPriceCents,
           billingPeriod: 'annual',
+          alreadyOwned: false,
           bookedMonths: monthRange(start),
           gameIds: windowGameIds
         });
@@ -245,7 +368,9 @@ export async function optimizeForTeams(teams: string[], coverageMode: CoverageMo
           packageId: item.id,
           name: item.name,
           costCents: monthlyPrice.monthlyPriceCents,
+          monthlyRateCents: monthlyPrice.monthlyPriceCents,
           billingPeriod: 'monthly',
+          alreadyOwned: false,
           bookedMonths: [month],
           gameIds
         });
@@ -262,20 +387,33 @@ export async function optimizeForTeams(teams: string[], coverageMode: CoverageMo
   const staggered = asOption('staggered', staggeredSolution, targetGameIds.length);
   const recommended = staggered.totalCostCents < annual.totalCostCents ? 'staggered' : 'annual';
   const recommendedCost = recommended === 'staggered' ? staggered.totalCostCents : annual.totalCostCents;
-  const naiveCostCents = annualCandidates.reduce((sum, candidate) => sum + candidate.costCents, 0);
-  const savingsCents = Math.max(0, naiveCostCents - recommendedCost);
+  const referenceCostCents = annual.totalCostCents;
+  const savingsCents = Math.max(0, referenceCostCents - recommendedCost);
+  const alternatives = await findAlternatives(targetGameIds, staggeredCandidates, staggeredSolution, targetGameIds.length);
+  const freeTv = [...gamesByPackage.entries()]
+    .filter(([packageId]) => packageById.get(packageId)?.prices.some((price) => price.monthlyPriceCents === 0))
+    .map(([packageId, gameIds]) => ({
+      packageId,
+      name: packageById.get(packageId)!.name,
+      coveredGameIds: [...new Set(gameIds)].sort((a, b) => a - b)
+    }))
+    .sort((a, b) => b.coveredGameIds.length - a.coveredGameIds.length);
 
   return {
     teams,
-    coverageMode,
+    dateRange: { start: input.startDate, end: input.endDate },
+    tournament: input.tournament ?? null,
+    existingPackageIds: input.existingPackageIds,
     games,
     unavailableGameIds,
     annual,
     staggered,
     recommended,
-    naiveCostCents,
+    alternatives,
+    freeTv,
+    referenceCostCents,
     savingsCents,
-    savingsPercent: naiveCostCents === 0 ? 0 : Math.round((savingsCents / naiveCostCents) * 100),
+    savingsPercent: referenceCostCents === 0 ? 0 : Math.round((savingsCents / referenceCostCents) * 100),
     savingsScore: annual.optimal && staggered.optimal ? 100 : 95,
     durationMs: Math.round((performance.now() - startedAt) * 10) / 10
   };

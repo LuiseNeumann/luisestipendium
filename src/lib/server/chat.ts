@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
 import { getDb, getPackages, listTeams } from './db';
 import { optimizeForTeams } from './optimizer';
-import type { CoverageMode, OptimizationResult } from '$lib/types';
+import type { OptimizationResult } from '$lib/types';
+import type { OptimizeInput } from './optimizer';
 
 interface KnowledgeChunk {
   id: string;
@@ -123,11 +124,11 @@ function resultContext(result: OptimizationResult) {
     .join(', ');
   return [
     `Ausgewählte Teams: ${result.teams.join(', ')}.`,
-    `Modus: ${result.coverageMode === 'live' ? 'Live' : 'Highlights'}.`,
+    `Betrachtungszeitraum: ${result.dateRange.start} bis ${result.dateRange.end}; Turnier: ${result.tournament ?? 'alle Turniere'}; optimiert werden Live-Spiele.`,
     `Relevante Spiele: ${result.games.length}; ohne Angebot: ${result.unavailableGameIds.length}.`,
     `Empfehlung: ${result.recommended === 'annual' ? 'Jahreskombination' : 'monatsweise Staffelung'} für ${euro(option.totalCostCents)}.`,
     `Pakete: ${packages || 'keine kostenpflichtigen Pakete'}.`,
-    `Ersparnis gegenüber dem Kauf aller relevanten Pakete: ${euro(result.savingsCents)} (${result.savingsPercent} %).`
+    `Ersparnis gegenüber der günstigsten reinen Jahresstrategie (${euro(result.referenceCostCents)}): ${euro(result.savingsCents)} (${result.savingsPercent} %).`
   ].join('\n');
 }
 
@@ -142,13 +143,13 @@ function localAnswer(message: string, result: OptimizationResult): ChatResponse 
   }
   if (/spar|günst|preis|kost/.test(normalized)) {
     return {
-      answer: `Die Empfehlung kostet ${euro(option.totalCostCents)}. Gegenüber allen relevanten Paketen sparst du ${euro(result.savingsCents)} (${result.savingsPercent} %).`,
+      answer: `Die Empfehlung kostet ${euro(option.totalCostCents)}. Gegenüber der günstigsten reinen Jahresstrategie mit ${euro(result.referenceCostCents)} sparst du ${euro(result.savingsCents)} (${result.savingsPercent} %).`,
       source: 'local'
     };
   }
   if (/spiel|übertrag|live|highlight/.test(normalized)) {
     return {
-      answer: `${result.games.length - result.unavailableGameIds.length} von ${result.games.length} Spielen sind im Modus ${result.coverageMode === 'live' ? 'Live' : 'Highlights'} abdeckbar.`,
+      answer: `${result.games.length - result.unavailableGameIds.length} von ${result.games.length} Live-Spielen sind im gewählten Zeitraum abdeckbar. ${result.freeTv.length} kostenlose Anbieter übertragen mindestens eines davon.`,
       source: 'local'
     };
   }
@@ -158,8 +159,8 @@ function localAnswer(message: string, result: OptimizationResult): ChatResponse 
   };
 }
 
-export async function answerQuestion(message: string, teams: string[], coverageMode: CoverageMode): Promise<ChatResponse> {
-  const result = await optimizeForTeams(teams, coverageMode);
+export async function answerQuestion(message: string, teams: string[], input: OptimizeInput): Promise<ChatResponse> {
+  const result = await optimizeForTeams(teams, input);
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return localAnswer(message, result);
 
@@ -183,7 +184,7 @@ export async function answerQuestion(message: string, teams: string[], coverageM
         {
           role: 'system',
           content:
-            'Du bist der deutschsprachige Sparberater dieser Streaming-App. Antworte knapp und ausschließlich anhand des bereitgestellten Kontexts. Erfinde keine Preise oder Übertragungsrechte. Geldbeträge nennst du in Euro.'
+            'Du bist der deutschsprachige Streaming-Berater dieser App. Antworte knapp und ausschließlich anhand des bereitgestellten Kontexts. Erfinde keine Preise oder Übertragungsrechte. Geldbeträge nennst du in Euro.'
         },
         { role: 'system', content: `Aktuelles Ergebnis:\n${resultContext(result)}\n\nAbgerufene Wissensbasis:\n${relevant}` },
         { role: 'user', content: message }
