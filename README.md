@@ -1,6 +1,6 @@
-# SparSpiel
+# Streaming Check
 
-SparSpiel ermittelt für bis zu acht ausgewählte Fußballmannschaften die günstigste Kombination aus Streaming-Paketen. Die Anwendung vergleicht eine statische Jahresstrategie mit einer monatsweise gestaffelten Buchung und erklärt, welches Paket welche Spiele abdeckt.
+Streaming Check ermittelt für bis zu acht ausgewählte Fußballmannschaften und einen frei wählbaren Zeitraum die günstigste Kombination aus Live-Streaming-Paketen. Die Anwendung vergleicht eine statische Jahresstrategie mit einer zeitlich gestaffelten Buchung und erklärt jeden Preisbestandteil.
 
 ## Schnellstart
 
@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Die Anwendung ist anschließend unter `http://localhost:5173` erreichbar. Ein OpenAI-Key ist optional; ohne Key verwendet der Sparberater ausschließlich lokale, aus dem Optimierungsergebnis erzeugte Antworten.
+Die Anwendung ist anschließend unter `http://localhost:5173` erreichbar. Ein OpenAI-Key ist optional; ohne Key verwendet der Streaming-Berater ausschließlich lokale, aus dem Optimierungsergebnis erzeugte Antworten.
 
 Mit Docker läuft das gesamte Projekt mit einem Befehl:
 
@@ -20,17 +20,21 @@ Mit Docker läuft das gesamte Projekt mit einem Befehl:
 docker compose up --build
 ```
 
-Danach ist SparSpiel unter `http://localhost:3000` erreichbar. Die automatisch importierte SQLite-Datenbank liegt in einem Docker-Volume.
+Danach ist Streaming Check unter `http://localhost:3000` erreichbar. Die automatisch importierte SQLite-Datenbank liegt in einem Docker-Volume.
 
 ## Funktionen
 
 - Suche und Mehrfachauswahl aus 941 Mannschaften
-- Getrennte Optimierung für Live-Übertragungen und Highlights
+- Frei wählbarer Datumsbereich für Live-Spiele
+- Optionaler Turnierfilter zusätzlich zum Datumsbereich
+- Bereits vorhandene Abos werden als 0,00 € Zusatzkosten berücksichtigt
+- Kostenlose Angebote von ARD, ZDF und weiteren Anbietern separat ausgewiesen
 - Exakte binäre Set-Cover-Optimierung über GLPK
 - Greedy-Fallback für große Instanzen oder nicht rechtzeitig gelöste Modelle
 - Vergleich von Jahresabos und monatsweise gebuchten Paketen
-- Euro-Preise, Ersparnis, Spar-Score und transparente Paket-Spiel-Zuordnung
-- RAG-Sparberater mit persistenten OpenAI-Embeddings in SQLite
+- Bis zu drei vollständige Alternativkombinationen
+- Euro-Preise, Kostenformel, Ersparnis, Spar-Score und transparente Paket-Spiel-Zuordnung
+- RAG-Streaming-Berater mit persistenten OpenAI-Embeddings in SQLite
 - Datenbasierter lokaler Chat-Fallback ohne API-Key
 - Responsive Oberfläche für Desktop und Mobilgeräte
 
@@ -63,7 +67,7 @@ SvelteKit stellt UI und JSON-API in einem Node-Prozess bereit. Beim ersten Daten
 - `streaming_offers`: Zuordnung Spiel/Paket mit separaten Live- und Highlight-Markierungen
 - `knowledge_embeddings`: persistente RAG-Chunks und Embedding-Vektoren
 
-`monthly_price_yearly_subscription_in_cents` wird als monatlicher Preis bei zwölf Monaten Bindung interpretiert. Entsprechend betragen die Jahreskosten den Feldwert mal zwölf. Eine leere Preisangabe bedeutet, dass diese Buchungsart nicht angeboten wird.
+`monthly_price_yearly_subscription_in_cents` wird als monatlicher Preis bei zwölf Monaten Bindung interpretiert. Entsprechend betragen die Jahreskosten den Feldwert mal zwölf. Eine leere Preisangabe bedeutet, dass diese Buchungsart nicht angeboten wird. Insbesondere wird für `MagentaTV - MegaSport` deshalb kein kündbarer Monatstarif erfunden: `60,00 € × 12 = 720,00 €` pro Bindungszeitraum.
 
 ### Datenqualität
 
@@ -93,11 +97,21 @@ Modelle mit höchstens 1.000 Variablen und 1.500 Spielen werden mit einem Zeitli
 
 Spiele ohne gültiges Angebot werden in der UI ausgewiesen und nicht fälschlich als abgedeckt gezählt.
 
+Bereits vorhandene Pakete decken ihre Spiele im gewählten Zeitraum ohne weitere Kosten ab. Diese Annahme wird in der Eingabe und jeder betroffenen Paketzeile sichtbar ausgewiesen. Die Alternativsuche schließt Pakete der optimalen Lösung schrittweise aus und löst das vollständige Modell erneut; dadurch entstehen bis zu drei Kombinationen mit tatsächlich anderen kostenpflichtigen Anbietern.
+
 ## Ersparnis und Spar-Score
 
-Der Referenzwert ist der Jahreskauf aller Pakete, die mindestens eines der ausgewählten Spiele abdecken. Davon werden die Kosten der günstigeren Strategie abgezogen. Sind beide ILP-Modelle exakt gelöst, erreicht die gewählte Lösung den Spar-Score 100. Bei Verwendung der zeitbegrenzten Näherung wird dies sichtbar auf 95 begrenzt und als schnelle Optimierung bezeichnet.
+Der Referenzwert ist nicht mehr der unrealistische Kauf aller am Markt vorkommenden Pakete. Stattdessen gilt transparent:
 
-## RAG-Sparberater
+```text
+günstigste vollständige Jahresstrategie
+− günstigste zeitoptimierte Kombination
+= ausgewiesene Ersparnis
+```
+
+Sind beide ILP-Modelle exakt gelöst, erreicht die gewählte Lösung den Spar-Score 100. Bei Verwendung der zeitbegrenzten Näherung wird dies sichtbar auf 95 begrenzt und als schnelle Optimierung bezeichnet.
+
+## RAG-Streaming-Berater
 
 Mit `OPENAI_API_KEY` werden Pakete, Preise, Teams und FAQ-Texte über `text-embedding-3-small` eingebettet. Die Vektoren werden anhand eines Inhalts-Hashes in SQLite wiederverwendet. Für eine Frage werden die sechs ähnlichsten Chunks per Kosinusähnlichkeit abgerufen und gemeinsam mit dem serverseitig neu berechneten Solver-Ergebnis an das konfigurierte Chatmodell übergeben. Function Calling kann eine neue Teamauswahl an die UI zurückgeben.
 
@@ -106,9 +120,10 @@ Ohne Key oder bei einem API-Fehler beantwortet eine lokale Logik Fragen zu Koste
 ## API
 
 - `GET /api/teams?q=bayern`: Teamsuche
-- `GET /api/games?team=FC+Bayern+München`: Spiele, Pakete und Übertragungsarten
-- `POST /api/optimize`: `{ "teams": [...], "coverageMode": "live" | "highlights" }`
-- `POST /api/chat`: `{ "message": "...", "teams": [...], "coverageMode": "live" | "highlights" }`
+- `GET /api/catalog`: Pakete, Turniere und verfügbarer Datumsbereich
+- `GET /api/games?team=Bayern+München&start=2024-07-01&end=2025-06-01&tournament=Bundesliga+24%2F25`: Spiele und Angebote
+- `POST /api/optimize`: `{ "teams": [...], "startDate": "2024-07-01", "endDate": "2025-06-01", "tournament": "Bundesliga 24/25", "existingPackageIds": [...] }`
+- `POST /api/chat`: dieselben Kontextfelder plus `message`
 - `GET /api/health`: Container-Healthcheck
 
 ## Qualitätssicherung
@@ -120,6 +135,8 @@ npm run build
 ```
 
 Der manuelle Neuimport der CSV-Dateien erfolgt mit `npm run db:import`.
+
+Ergibt die Kombination aus Teams, Zeitraum und Turnier keine Spiele, zeigt die UI eine Diagnose mit allen angewendeten Filtern und passenden Korrekturhinweisen statt leerer Preisempfehlungen.
 
 ## Noch außerhalb des Umfangs
 
