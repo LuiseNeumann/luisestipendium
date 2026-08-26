@@ -23,6 +23,16 @@
   let chatOpen = false;
   let chatFabFooterOffset = 0;
   let footerElement: HTMLElement;
+  let finderCardElement: HTMLElement;
+  let annualPlanElement: HTMLElement;
+  let staggeredPlanElement: HTMLElement;
+  let dealBallX = 0;
+  let dealBallY = 0;
+  let dealBallRotation = 0;
+  let dealBallScale = 1;
+  let dealBallVisible = false;
+  let dealBallLanded = false;
+  let scheduleDealBallUpdate = () => {};
   let gameById = new Map<number, Game>();
 
   $: gameById = new Map(result?.games.map((game) => [game.id, game]) ?? []);
@@ -64,6 +74,57 @@
       resizeObserver.disconnect();
       window.removeEventListener('scroll', updateChatFabOffset);
       window.removeEventListener('resize', updateChatFabOffset);
+    };
+  });
+
+  onMount(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let animationFrame = 0;
+    const updateDealBall = () => {
+      if (!result || result.games.length === 0 || !finderCardElement || !annualPlanElement || !staggeredPlanElement) {
+        dealBallVisible = false;
+        dealBallLanded = false;
+        return;
+      }
+
+      if (reduceMotion) {
+        dealBallVisible = false;
+        dealBallLanded = true;
+        return;
+      }
+
+      const targetElement = result.recommended === 'annual' ? annualPlanElement : staggeredPlanElement;
+      const finderRect = finderCardElement.getBoundingClientRect();
+      const targetRect = targetElement.getBoundingClientRect();
+      const startX = finderRect.right - 4;
+      const startDocumentY = finderRect.bottom + window.scrollY - 12;
+      const targetX = targetRect.right - 42;
+      const targetDocumentY = targetRect.top + window.scrollY - 2;
+      const flightStart = Math.max(0, startDocumentY - window.innerHeight * 0.72);
+      const flightEnd = Math.max(flightStart + 1, targetDocumentY - window.innerHeight * 0.52);
+      const progress = Math.min(1, Math.max(0, (window.scrollY - flightStart) / (flightEnd - flightStart)));
+      const arc = Math.sin(progress * Math.PI) * Math.min(130, window.innerWidth * 0.09);
+
+      dealBallX = startX + (targetX - startX) * progress;
+      dealBallY = startDocumentY + (targetDocumentY - startDocumentY) * progress - window.scrollY - arc;
+      dealBallRotation = progress * 720;
+      dealBallScale = 1 + Math.sin(progress * Math.PI) * 0.22;
+      dealBallVisible = progress < 0.995;
+      dealBallLanded = progress >= 0.995;
+    };
+
+    scheduleDealBallUpdate = () => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(updateDealBall);
+    };
+    window.addEventListener('scroll', scheduleDealBallUpdate, { passive: true });
+    window.addEventListener('resize', scheduleDealBallUpdate);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      window.removeEventListener('scroll', scheduleDealBallUpdate);
+      window.removeEventListener('resize', scheduleDealBallUpdate);
+      scheduleDealBallUpdate = () => {};
     };
   });
 
@@ -134,7 +195,10 @@
       const data = (await response.json()) as OptimizationResult & { message?: string };
       if (!response.ok) throw new Error(data.message ?? 'Die Optimierung ist fehlgeschlagen.');
       result = data;
-      requestAnimationFrame(() => document.querySelector('#ergebnis')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      requestAnimationFrame(() => {
+        scheduleDealBallUpdate();
+        document.querySelector('#ergebnis')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch (error) {
       errorMessage = (error as Error).message;
     } finally {
@@ -170,7 +234,9 @@
         <div class="trust"><span>✓ Exakt optimiert</span><span>✓ Transparent erklärt</span><span>✓ 8.871 Spiele</span></div>
       </div>
 
-      <div class="finder-card">
+      <div class="finder-wrap">
+      {#if !result || result.games.length === 0}<div class="deal-ball-start" aria-hidden="true">⚽</div>{/if}
+      <div class="finder-card" bind:this={finderCardElement}>
         <div class="step"><span>1</span><div><strong>Teams auswählen</strong><small>Bis zu 8 Mannschaften vergleichen</small></div></div>
         <TeamPicker selected={teams} onselect={addTeam} onremove={removeTeam} />
 
@@ -223,6 +289,7 @@
         {#if errorMessage}<p class="error" role="alert">{errorMessage}</p>{/if}
         <p class="privacy">Keine Anmeldung. Keine Vertragsvermittlung. Nur dein Sparplan.</p>
       </div>
+      </div>
     </div>
   </section>
 
@@ -266,8 +333,14 @@
       {/if}
 
       <div class="plan-grid">
-        <PlanCard option={result.annual} recommended={result.recommended === 'annual'} {gameById} />
-        <PlanCard option={result.staggered} recommended={result.recommended === 'staggered'} {gameById} />
+        <div class="plan-slot" bind:this={annualPlanElement}>
+          {#if dealBallLanded && result.recommended === 'annual'}<div class="top-deal-badge"><span>⚽</span> Volltreffer!</div>{/if}
+          <PlanCard option={result.annual} recommended={result.recommended === 'annual'} {gameById} />
+        </div>
+        <div class="plan-slot" bind:this={staggeredPlanElement}>
+          {#if dealBallLanded && result.recommended === 'staggered'}<div class="top-deal-badge"><span>⚽</span> Volltreffer!</div>{/if}
+          <PlanCard option={result.staggered} recommended={result.recommended === 'staggered'} {gameById} />
+        </div>
       </div>
 
       <section class="free-tv-section">
@@ -321,6 +394,10 @@
   {/if}
 </main>
 
+{#if result && dealBallVisible}
+  <div class="deal-ball-flight" style={`left: ${dealBallX}px; top: ${dealBallY}px; transform: translate(-50%, -50%) rotate(${dealBallRotation}deg) scale(${dealBallScale})`} aria-hidden="true">⚽</div>
+{/if}
+
 <footer bind:this={footerElement}><a class="brand" href="/"><span>✓</span><strong>Streaming</strong> Check</a><p>Ein Vergleichsprototyp für die CHECK24 TechUp Coding Challenge.</p><span>Datenstand: bereitgestellter Challenge-Datensatz</span></footer>
 
 {#if teams.length > 0}
@@ -361,7 +438,9 @@
   .hero-copy > p { max-width: 37rem; margin: 0; color: #d0e4f6; font-size: 1.05rem; line-height: 1.6; }
   .trust { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; color: #d6eafb; font-size: .76rem; font-weight: 700; }
   .trust span::first-letter { color: #ffb514; }
-  .finder-card { padding: 1.5rem; border-radius: 20px; background: #fff; box-shadow: 0 24px 60px rgba(0,20,46,.3); }
+  .finder-wrap { position: relative; }
+  .finder-card { position: relative; z-index: 2; padding: 1.5rem; border-radius: 20px; background: #fff; box-shadow: 0 24px 60px rgba(0,20,46,.3); }
+  .deal-ball-start { position: absolute; z-index: 1; right: -1rem; bottom: -.5rem; display: grid; width: 2.5rem; height: 2.5rem; place-items: center; filter: drop-shadow(0 8px 8px rgba(0,20,46,.3)); font-size: 2.15rem; line-height: 1; }
   .step { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.2rem; }
   .step > span { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 8px; background: #063773; color: #fff; font-size: .8rem; font-weight: 900; }
   .step div { display: flex; flex-direction: column; }
@@ -418,7 +497,7 @@
   .process strong { font-size: .85rem; }
   .process p { margin: .15rem 0 0; color: #829ab1; font-size: .7rem; line-height: 1.35; }
   .process i { width: 4rem; height: 1px; background: #dce7f2; }
-  .results { max-width: 1400px; margin: auto; padding: 5.5rem 2rem; scroll-margin-top: 1rem; }
+  .results { position: relative; z-index: 2; max-width: 1400px; margin: auto; padding: 5.5rem 2rem; scroll-margin-top: 1rem; }
   .section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.8rem; }
   .kicker.dark { color: #0874d1; }
   h2 { margin: .35rem 0; color: #102a43; font-size: clamp(1.8rem, 3vw, 2.65rem); letter-spacing: -.035em; }
@@ -443,6 +522,10 @@
   .no-games-diagnostic p { margin: .45rem 0 0; font-size: .78rem; line-height: 1.5; }
   .no-games-diagnostic .debug-info { padding-top: .55rem; border-top: 1px solid #efd78f; color: #80691f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; }
   .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+  .plan-slot { position: relative; min-width: 0; }
+  .deal-ball-flight { position: fixed; z-index: 1; display: grid; width: 2.5rem; height: 2.5rem; place-items: center; pointer-events: none; filter: drop-shadow(0 8px 8px rgba(3,36,73,.25)); font-size: 2.15rem; line-height: 1; will-change: left, top, transform; }
+  .top-deal-badge { position: absolute; z-index: 5; top: -1rem; right: 1.1rem; display: inline-flex; align-items: center; gap: .4rem; padding: .42rem .72rem; border: 2px solid #fff; border-radius: 999px; background: #f5a000; color: #172f4d; box-shadow: 0 7px 18px rgba(3,36,73,.2); font-size: .72rem; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; animation: deal-land .36s ease-out both; }
+  .top-deal-badge span { font-size: 1rem; line-height: 1; }
   .free-tv-section, .alternatives-section { margin-top: 2.2rem; }
   .subheading { display: flex; align-items: end; justify-content: space-between; gap: 2rem; margin-bottom: 1rem; }
   .subheading > div > span { color: #0874d1; font-size: .67rem; font-weight: 900; letter-spacing: .11em; text-transform: uppercase; }
@@ -491,12 +574,16 @@
   .chat-fab strong { font-size: .72rem; }
   .chat-fab small { margin-top: .1rem; color: #0874d1; font-size: .65rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes deal-land { from { opacity: 0; transform: translateY(-.8rem) scale(.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .top-deal-badge { animation: none; }
+  }
   @media (max-width: 900px) {
     .hero-inner { grid-template-columns: 1fr; gap: 2.5rem; padding-top: 3.5rem; }
     .hero-copy { text-align: center; }
     .hero-copy > p { margin-inline: auto; }
     .trust { justify-content: center; }
-    .finder-card { width: min(100%, 31rem); margin: auto; }
+    .finder-wrap { width: min(100%, 31rem); margin: auto; }
     .process { margin: 1rem; grid-template-columns: 1fr 1fr 1fr; }
     .process i { display: none; }
     .savings-banner { grid-template-columns: 1fr 1fr; }
