@@ -21,6 +21,8 @@
   let loading = false;
   let errorMessage = '';
   let chatOpen = false;
+  let chatFabFooterOffset = 0;
+  let footerElement: HTMLElement;
   let gameById = new Map<number, Game>();
 
   $: gameById = new Map(result?.games.map((game) => [game.id, game]) ?? []);
@@ -41,6 +43,28 @@
     start.setUTCFullYear(start.getUTCFullYear() - 1);
     start.setUTCDate(start.getUTCDate() + 1);
     startDate = start.toISOString().slice(0, 10) < dateBounds.start ? dateBounds.start : start.toISOString().slice(0, 10);
+  });
+
+  onMount(() => {
+    let animationFrame = 0;
+    const updateChatFabOffset = () => {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = requestAnimationFrame(() => {
+        chatFabFooterOffset = Math.max(0, window.innerHeight - footerElement.getBoundingClientRect().top);
+      });
+    };
+    const resizeObserver = new ResizeObserver(updateChatFabOffset);
+    resizeObserver.observe(document.body);
+    window.addEventListener('scroll', updateChatFabOffset, { passive: true });
+    window.addEventListener('resize', updateChatFabOffset);
+    updateChatFabOffset();
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener('scroll', updateChatFabOffset);
+      window.removeEventListener('resize', updateChatFabOffset);
+    };
   });
 
   function addTeam(team: string) {
@@ -154,11 +178,10 @@
         <fieldset class="existing-fieldset">
           <legend>Schon ein Abo vorhanden?</legend>
           <div class="package-select">
-            <select bind:value={packageToAdd} aria-label="Vorhandenes Paket auswählen">
+            <select bind:value={packageToAdd} onchange={addExistingPackage} aria-label="Vorhandenes Paket auswählen">
               <option value="">Paket auswählen (optional)</option>
               {#each packages.filter((item) => !existingPackageIds.includes(item.id) && item.prices.some((price) => price.monthlyPriceCents > 0)) as item}<option value={item.id}>{item.name}</option>{/each}
             </select>
-            <button type="button" onclick={addExistingPackage} disabled={!packageToAdd}>Hinzufügen</button>
           </div>
           {#if existingPackageIds.length > 0}
             <div class="owned-chips">
@@ -213,7 +236,6 @@
           <div><span>– Zeitoptimierter Plan</span><strong>{formatEuro(recommendedOption.totalCostCents)}</strong></div>
           <div class="formula"><span>= Nachvollziehbare Ersparnis</span><strong>{formatEuro(result.savingsCents)}</strong></div>
         </div>
-        <div class="score" style={`--score: ${result.savingsScore * 3.6}deg`}><div><strong>{result.savingsScore}%</strong><span>Spar-Score</span></div></div>
       </div>
 
       {#if result.unavailableGameIds.length > 0}
@@ -276,10 +298,10 @@
   {/if}
 </main>
 
-<footer><a class="brand" href="/"><span>✓</span><strong>Streaming</strong> Check</a><p>Ein Vergleichsprototyp für die CHECK24 TechUp Coding Challenge.</p><span>Datenstand: bereitgestellter Challenge-Datensatz</span></footer>
+<footer bind:this={footerElement}><a class="brand" href="/"><span>✓</span><strong>Streaming</strong> Check</a><p>Ein Vergleichsprototyp für die CHECK24 TechUp Coding Challenge.</p><span>Datenstand: bereitgestellter Challenge-Datensatz</span></footer>
 
 {#if teams.length > 0}
-  <button class="chat-fab" type="button" onclick={() => (chatOpen = true)} aria-label="Streaming-Berater öffnen"><span>◌</span><div><strong>Fragen zum Ergebnis?</strong><small>Streaming-Berater öffnen</small></div></button>
+  <button class="chat-fab" style={`--footer-offset: ${chatFabFooterOffset}px`} type="button" onclick={() => (chatOpen = true)} aria-label="Streaming-Berater öffnen"><span>◌</span><div><strong>Fragen zum Ergebnis?</strong><small>Streaming-Berater öffnen</small></div></button>
 {/if}
 <ChatPanel open={chatOpen} {teams} {startDate} {endDate} {tournament} {existingPackageIds} onclose={() => (chatOpen = false)} onteams={replaceTeams} />
 
@@ -336,10 +358,8 @@
   .date-input button:focus-visible { outline: 2px solid #0874d1; outline-offset: 1px; }
   .date-input svg { width: 1.15rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
   .tournament-fieldset select { margin-top: 0; }
-  .package-select { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+  .package-select { display: block; }
   .package-select select { margin: 0; min-width: 0; }
-  .package-select button { border: 0; border-radius: 9px; padding: 0 .8rem; background: #e8f4ff; color: #075b9f; font-size: .72rem; font-weight: 800; cursor: pointer; }
-  .package-select button:disabled { cursor: not-allowed; opacity: .5; }
   .owned-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }
   .owned-chips > span { display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .4rem .35rem .6rem; border-radius: 999px; background: #e9f5ee; color: #28734a; font-size: .67rem; font-weight: 800; }
   .owned-chips button { display: grid; width: 1.15rem; height: 1.15rem; padding: 0; place-items: center; border: 0; border-radius: 50%; background: #fff; color: #28734a; cursor: pointer; }
@@ -366,7 +386,7 @@
   h2 { margin: .35rem 0; color: #102a43; font-size: clamp(1.8rem, 3vw, 2.65rem); letter-spacing: -.035em; }
   .section-heading p { margin: 0; color: #627d98; font-size: .85rem; }
   .runtime { padding: .5rem .7rem; border-radius: 8px; background: #e9f5ee; color: #28734a; font-size: .7rem; font-weight: 800; }
-  .savings-banner { display: grid; overflow: hidden; min-height: 10rem; margin-bottom: 1.5rem; border-radius: 18px; background: #063773; color: #fff; grid-template-columns: 1fr 1.4fr auto; align-items: center; }
+  .savings-banner { display: grid; overflow: hidden; min-height: 10rem; margin-bottom: 1.5rem; border-radius: 18px; background: #063773; color: #fff; grid-template-columns: minmax(18rem, .9fr) minmax(24rem, 1.6fr); align-items: stretch; }
   .saving-main { align-self: stretch; display: flex; padding: 1.5rem 2rem; flex-direction: column; justify-content: center; background: linear-gradient(135deg, #0874d1, #075ba4); }
   .saving-main span { color: #bfddf5; font-size: .75rem; font-weight: 800; text-transform: uppercase; }
   .saving-main strong { margin: .15rem 0; color: #ffbd2e; font-size: 2.75rem; line-height: 1; letter-spacing: -.05em; }
@@ -378,10 +398,6 @@
   .saving-compare .formula strong { color: #ffcf65; }
   .bar { height: .65rem; margin: .7rem 0; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.18); }
   .bar i { display: block; height: 100%; min-width: .65rem; border-radius: inherit; background: #ffb514; }
-  .score { width: 6.5rem; height: 6.5rem; margin-right: 2rem; padding: .45rem; border-radius: 50%; background: conic-gradient(#ffb514 var(--score), rgba(255,255,255,.16) 0); }
-  .score > div { display: grid; width: 100%; height: 100%; place-content: center; border-radius: 50%; background: #063773; text-align: center; }
-  .score strong { font-size: 1.35rem; }
-  .score span { color: #bfddf5; font-size: .62rem; }
   .notice { margin-bottom: 1.5rem; padding: .85rem 1rem; border-left: 4px solid #f5a000; border-radius: 8px; background: #fff7e3; color: #70510a; font-size: .79rem; line-height: 1.5; }
   .no-games-diagnostic { display: flex; max-width: 60rem; align-items: flex-start; gap: 1rem; padding: 1.4rem; border: 1px solid #f1cf7a; border-radius: 14px; background: #fff9e9; color: #5d4916; }
   .no-games-diagnostic > span { display: grid; flex: 0 0 auto; width: 2.2rem; height: 2.2rem; place-items: center; border-radius: 50%; background: #f5a000; color: #382b08; font-weight: 900; }
@@ -431,7 +447,7 @@
   footer { display: flex; min-height: 7rem; align-items: center; gap: 2rem; padding: 1.5rem 2rem; background: #042a58; color: #9fbcd5; font-size: .7rem; }
   footer p { margin-left: auto; }
   footer .brand { color: #fff; }
-  .chat-fab { position: fixed; z-index: 20; right: 1.2rem; bottom: 1.2rem; display: flex; align-items: center; gap: .65rem; padding: .65rem 1rem .65rem .65rem; border: 0; border-radius: 14px; background: #fff; color: #243b53; box-shadow: 0 8px 30px rgba(3,36,73,.22); cursor: pointer; }
+  .chat-fab { position: fixed; z-index: 20; right: 1.2rem; bottom: calc(1.2rem + var(--footer-offset)); display: flex; align-items: center; gap: .65rem; padding: .65rem 1rem .65rem .65rem; border: 0; border-radius: 14px; background: #fff; color: #243b53; box-shadow: 0 8px 30px rgba(3,36,73,.22); cursor: pointer; }
   .chat-fab > span { display: grid; width: 2.3rem; height: 2.3rem; place-items: center; border-radius: 10px; background: #f5a000; color: #063773; font-size: 1.2rem; }
   .chat-fab div { display: flex; flex-direction: column; text-align: left; }
   .chat-fab strong { font-size: .72rem; }
@@ -445,10 +461,9 @@
     .finder-card { width: min(100%, 31rem); margin: auto; }
     .process { margin: 1rem; grid-template-columns: 1fr 1fr 1fr; }
     .process i { display: none; }
-    .savings-banner { grid-template-columns: 1fr 1fr auto; }
+    .savings-banner { grid-template-columns: 1fr 1fr; }
     .saving-main { padding: 1.3rem; }
     .saving-compare { padding: 1.3rem; }
-    .score { margin-right: 1.3rem; }
     .free-grid { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 720px) {
@@ -460,10 +475,9 @@
     .process { display: none; }
     .results { padding: 3.5rem 1rem; }
     .section-heading { align-items: flex-start; flex-direction: column; }
-    .savings-banner { grid-template-columns: 1fr auto; }
-    .saving-main { grid-column: 1 / 3; }
+    .savings-banner { grid-template-columns: 1fr; }
+    .saving-main { grid-column: auto; }
     .saving-compare { padding: 1.25rem; }
-    .score { width: 5.5rem; height: 5.5rem; margin: 1rem; }
     .plan-grid { grid-template-columns: 1fr; }
     .subheading { align-items: flex-start; flex-direction: column; gap: .4rem; }
     .free-grid { grid-template-columns: 1fr; }

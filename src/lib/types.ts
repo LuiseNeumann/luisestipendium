@@ -68,6 +68,5 @@ export interface OptimizationResult {
   referenceCostCents: number;
   savingsCents: number;
   savingsPercent: number;
-  savingsScore: number;
   durationMs: number;
 }

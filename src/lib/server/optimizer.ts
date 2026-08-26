@@ -414,7 +414,6 @@ export async function optimizeForTeams(teams: string[], input: OptimizeInput): P
     referenceCostCents,
     savingsCents,
     savingsPercent: referenceCostCents === 0 ? 0 : Math.round((savingsCents / referenceCostCents) * 100),
-    savingsScore: annual.optimal && staggered.optimal ? 100 : 95,
     durationMs: Math.round((performance.now() - startedAt) * 10) / 10
   };
 }

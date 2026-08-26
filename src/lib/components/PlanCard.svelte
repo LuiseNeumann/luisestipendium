@@ -31,7 +31,7 @@
     </div>
     <div class="price">
       <strong>{formatEuro(option.totalCostCents)}</strong>
-      <span>Gesamtkosten</span>
+      <span>Zu zahlende Gesamtkosten</span>
     </div>
   </header>
   <div class="coverage"><strong>{option.coveredGameCount}</strong> Spiele abgedeckt <span>·</span> {option.optimal ? 'exakt optimiert' : 'schnell optimiert'}</div>
@@ -42,11 +42,13 @@
     {:else}
       {#each option.packages as item}
         {@const packageKey = `${item.packageId}-${item.billingPeriod}`}
-        <details>
+        <details class:owned={item.alreadyOwned}>
           <summary>
             <span class="package-icon">▶</span>
             <span class="package-name"><strong>{item.name}</strong><small>{item.coveredGameIds.length} Spiele</small></span>
-            <span class="package-price">{formatEuro(item.costCents)}<small>Zusatzkosten</small></span>
+            <span class="package-price">
+              {#if item.alreadyOwned}<strong>Schon vorhanden</strong><small>0,00 € Zusatzkosten</small>{:else}{formatEuro(item.costCents)}<small>Zusatzkosten</small>{/if}
+            </span>
             <span class="chevron">⌄</span>
           </summary>
           <div class="explanation">
@@ -103,12 +105,17 @@
   summary { display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; align-items: center; gap: .75rem; padding: .95rem 1.45rem; list-style: none; cursor: pointer; }
   summary::-webkit-details-marker { display: none; }
   summary:hover { background: #f8fbfe; }
+  details.owned summary { background: #f1f4f7; }
+  details.owned summary:hover { background: #e9edf1; }
+  details.owned .package-icon { background: #dfe5ea; color: #718096; }
+  details.owned .package-name strong, details.owned .package-price, details.owned .package-price strong { color: #718096; }
   .package-icon { display: grid; width: 1.8rem; height: 1.8rem; place-items: center; border-radius: 7px; background: #e8f4ff; color: #0874d1; font-size: .65rem; }
   .package-name { min-width: 0; }
   .package-name strong, .package-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .package-name strong { color: #243b53; font-size: .88rem; }
   .package-name small { margin-top: .15rem; color: #829ab1; font-size: .72rem; }
   .package-price { color: #243b53; font-size: .88rem; font-weight: 800; text-align: right; }
+  .package-price strong { display: block; font-size: .78rem; }
   .package-price small { display: block; margin-top: .12rem; color: #829ab1; font-size: .58rem; font-weight: 500; }
   .chevron { color: #829ab1; transition: transform .2s; }
   details[open] .chevron { transform: rotate(180deg); }

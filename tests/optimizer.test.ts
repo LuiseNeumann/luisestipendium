@@ -60,9 +60,14 @@ describe('solveCover', () => {
       existingPackageIds: [2]
     });
     const megaSport = result[result.recommended].packages.find((item) => item.packageId === 2);
+    const recommended = result[result.recommended];
 
     expect(megaSport?.alreadyOwned).toBe(true);
     expect(megaSport?.costCents).toBe(0);
+    expect(recommended.totalCostCents).toBe(899);
+    expect(recommended.totalCostCents).toBe(
+      recommended.packages.filter((item) => !item.alreadyOwned).reduce((sum, item) => sum + item.costCents, 0)
+    );
     expect(result.referenceCostCents).toBe(result.annual.totalCostCents);
   });
 

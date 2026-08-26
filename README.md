@@ -33,7 +33,7 @@ Danach ist Streaming Check unter `http://localhost:3000` erreichbar. Die automat
 - Greedy-Fallback für große Instanzen oder nicht rechtzeitig gelöste Modelle
 - Vergleich von Jahresabos und monatsweise gebuchten Paketen
 - Bis zu drei vollständige Alternativkombinationen
-- Euro-Preise, Kostenformel, Ersparnis, Spar-Score und transparente Paket-Spiel-Zuordnung
+- Euro-Preise, Kostenformel, Ersparnis und transparente Paket-Spiel-Zuordnung
 - RAG-Streaming-Berater mit persistenten OpenAI-Embeddings in SQLite
 - Datenbasierter lokaler Chat-Fallback ohne API-Key
 - Responsive Oberfläche für Desktop und Mobilgeräte
@@ -99,7 +99,7 @@ Spiele ohne gültiges Angebot werden in der UI ausgewiesen und nicht fälschlich
 
 Bereits vorhandene Pakete decken ihre Spiele im gewählten Zeitraum ohne weitere Kosten ab. Diese Annahme wird in der Eingabe und jeder betroffenen Paketzeile sichtbar ausgewiesen. Die Alternativsuche schließt Pakete der optimalen Lösung schrittweise aus und löst das vollständige Modell erneut; dadurch entstehen bis zu drei Kombinationen mit tatsächlich anderen kostenpflichtigen Anbietern.
 
-## Ersparnis und Spar-Score
+## Ersparnis
 
 Der Referenzwert ist nicht mehr der unrealistische Kauf aller am Markt vorkommenden Pakete. Stattdessen gilt transparent:
 
@@ -108,8 +108,6 @@ günstigste vollständige Jahresstrategie
 − günstigste zeitoptimierte Kombination
 = ausgewiesene Ersparnis
 ```
-
-Sind beide ILP-Modelle exakt gelöst, erreicht die gewählte Lösung den Spar-Score 100. Bei Verwendung der zeitbegrenzten Näherung wird dies sichtbar auf 95 begrenzt und als schnelle Optimierung bezeichnet.
 
 ## RAG-Streaming-Berater
 
