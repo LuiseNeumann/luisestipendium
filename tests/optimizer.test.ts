@@ -36,6 +36,12 @@ describe('solveCover', () => {
     expect(result.totalCostCents).toBe(300);
   });
 
+  it('meldet eine nicht vollständig abdeckbare Spielmenge ohne Solver-Absturz', async () => {
+    const result = await solveCover([1, 2], [candidate('p1', 500, [1])]);
+
+    expect(result).toEqual({ selected: [], totalCostCents: 0, optimal: false, feasible: false });
+  });
+
   it('liefert für eine leere Spielmenge eine leere optimale Lösung', async () => {
     await expect(solveCover([], [])).resolves.toEqual({ selected: [], totalCostCents: 0, optimal: true, feasible: true });
   });

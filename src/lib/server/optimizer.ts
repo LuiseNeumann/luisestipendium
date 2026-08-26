@@ -78,6 +78,10 @@ export async function solveCover(gameIds: number[], candidates: CoverCandidate[]
   if (gameIds.length === 0) return { selected: [], totalCostCents: 0, optimal: true, feasible: true };
 
   const usefulCandidates = candidates.filter((candidate) => candidate.gameIds.length > 0);
+  const coveredGameIds = new Set(usefulCandidates.flatMap((candidate) => candidate.gameIds));
+  if (gameIds.some((gameId) => !coveredGameIds.has(gameId))) {
+    return { selected: [], totalCostCents: 0, optimal: false, feasible: false };
+  }
   if (usefulCandidates.length > 1_000 || gameIds.length > 1_500) {
     return greedyCover(gameIds, usefulCandidates);
   }
