@@ -56,7 +56,7 @@ export interface FreeTvCoverage {
 export interface OptimizationResult {
   teams: string[];
   dateRange: { start: string; end: string };
-  tournament: string | null;
+  tournaments: string[];
   existingPackageIds: number[];
   games: Game[];
   unavailableGameIds: number[];

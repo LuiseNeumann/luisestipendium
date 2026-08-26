@@ -124,7 +124,7 @@ function resultContext(result: OptimizationResult) {
     .join(', ');
   return [
     `Ausgewählte Teams: ${result.teams.join(', ')}.`,
-    `Betrachtungszeitraum: ${result.dateRange.start} bis ${result.dateRange.end}; Turnier: ${result.tournament ?? 'alle Turniere'}; optimiert werden Live-Spiele.`,
+    `Betrachtungszeitraum: ${result.dateRange.start} bis ${result.dateRange.end}; Turniere: ${result.tournaments.length > 0 ? result.tournaments.join(', ') : 'alle Turniere'}; optimiert werden Live-Spiele.`,
     `Relevante Spiele: ${result.games.length}; ohne Angebot: ${result.unavailableGameIds.length}.`,
     `Empfehlung: ${result.recommended === 'annual' ? 'Jahreskombination' : 'monatsweise Staffelung'} für ${euro(option.totalCostCents)}.`,
     `Pakete: ${packages || 'keine kostenpflichtigen Pakete'}.`,

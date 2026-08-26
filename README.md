@@ -26,7 +26,7 @@ Danach ist Streaming Check unter `http://localhost:3000` erreichbar. Die automat
 
 - Suche und Mehrfachauswahl aus 941 Mannschaften
 - Frei wählbarer Datumsbereich für Live-Spiele
-- Optionaler Turnierfilter, der den Datumsbereich automatisch auf die vorhandenen Turnierspiele setzt
+- Optionaler Mehrfach-Turnierfilter, der den Datumsbereich automatisch über die ausgewählten Turniere spannt
 - Bereits vorhandene Abos werden als 0,00 € Zusatzkosten berücksichtigt
 - Kostenlose Angebote von ARD, ZDF und weiteren Anbietern separat ausgewiesen
 - Exakte binäre Set-Cover-Optimierung über GLPK
@@ -134,7 +134,7 @@ npm run build
 
 Der manuelle Neuimport der CSV-Dateien erfolgt mit `npm run db:import`.
 
-Ergibt die Kombination aus Teams, Zeitraum und Turnier keine Spiele, zeigt die UI eine Diagnose mit allen angewendeten Filtern und passenden Korrekturhinweisen statt leerer Preisempfehlungen.
+Ergibt die Kombination aus Teams, Zeitraum und Turnieren keine Spiele, zeigt die UI eine Diagnose mit allen angewendeten Filtern und passenden Korrekturhinweisen statt leerer Preisempfehlungen.
 
 ## Noch außerhalb des Umfangs
 

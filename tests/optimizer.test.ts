@@ -76,11 +76,11 @@ describe('solveCover', () => {
       startDate: '2024-06-01',
       endDate: '2024-07-31',
       existingPackageIds: [],
-      tournament: 'Europameisterschaft 2024'
+      tournaments: ['Europameisterschaft 2024']
     });
 
     expect(result.games).toHaveLength(0);
-    expect(result.tournament).toBe('Europameisterschaft 2024');
+    expect(result.tournaments).toEqual(['Europameisterschaft 2024']);
     expect(result.annual.totalCostCents).toBe(0);
   });
 });

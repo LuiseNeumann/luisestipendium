@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { optimizeForTeams } from '$lib/server/optimizer';
-import { getDataBounds, packagesExist, teamsExist, tournamentExists } from '$lib/server/db';
+import { getDataBounds, packagesExist, teamsExist, tournamentsExist } from '$lib/server/db';
 
 export async function POST({ request }) {
   const body = (await request.json()) as {
@@ -8,7 +8,7 @@ export async function POST({ request }) {
     startDate?: unknown;
     endDate?: unknown;
     existingPackageIds?: unknown;
-    tournament?: unknown;
+    tournaments?: unknown;
   };
   if (!Array.isArray(body.teams) || body.teams.some((team) => typeof team !== 'string')) {
     error(400, '`teams` muss eine Liste von Mannschaftsnamen sein.');
@@ -28,8 +28,12 @@ export async function POST({ request }) {
   }
   const existingPackageIds = [...new Set(rawExistingPackageIds as number[])];
   if (!packagesExist(existingPackageIds)) error(400, 'Mindestens ein vorhandenes Paket ist unbekannt.');
-  const tournament = typeof body.tournament === 'string' && body.tournament.trim() ? body.tournament.trim() : undefined;
-  if (tournament && !tournamentExists(tournament)) error(400, 'Das ausgewählte Turnier ist unbekannt.');
+  const rawTournaments = body.tournaments ?? [];
+  if (!Array.isArray(rawTournaments) || rawTournaments.some((tournament) => typeof tournament !== 'string')) {
+    error(400, '`tournaments` muss eine Liste gültiger Turniernamen sein.');
+  }
+  const tournaments = [...new Set(rawTournaments.map((tournament) => tournament.trim()).filter(Boolean))];
+  if (!tournamentsExist(tournaments)) error(400, 'Mindestens ein ausgewähltes Turnier ist unbekannt.');
 
-  return json(await optimizeForTeams(teams, { startDate, endDate, existingPackageIds, tournament }));
+  return json(await optimizeForTeams(teams, { startDate, endDate, existingPackageIds, tournaments }));
 }

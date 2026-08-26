@@ -9,7 +9,7 @@
   let teams: string[] = [];
   let packages: StreamingPackage[] = [];
   let tournaments: Array<{ name: string; start: string; end: string }> = [];
-  let tournament = '';
+  let selectedTournaments: string[] = [];
   let existingPackageIds: number[] = [];
   let packageToAdd = '';
   let dateBounds = { start: '', end: '' };
@@ -92,13 +92,28 @@
     return packages.find((item) => item.id === packageId)?.name ?? `Paket ${packageId}`;
   }
 
-  function changeTournament() {
-    const selected = tournaments.find((item) => item.name === tournament);
-    if (selected) {
-      startDate = selected.start;
-      endDate = selected.end;
+  function toggleTournament(name: string) {
+    const selected = new Set(selectedTournaments);
+    if (selected.has(name)) selected.delete(name);
+    else selected.add(name);
+    selectedTournaments = tournaments.filter((item) => selected.has(item.name)).map((item) => item.name);
+    const ranges = tournaments.filter((item) => selected.has(item.name));
+    if (ranges.length > 0) {
+      startDate = ranges.reduce((earliest, item) => item.start < earliest ? item.start : earliest, ranges[0].start);
+      endDate = ranges.reduce((latest, item) => item.end > latest ? item.end : latest, ranges[0].end);
     }
     result = null;
+  }
+
+  function clearTournaments() {
+    selectedTournaments = [];
+    result = null;
+  }
+
+  function tournamentLabel(items: string[]) {
+    if (items.length === 0) return 'Alle Turniere';
+    if (items.length <= 2) return items.join(' · ');
+    return `${items.slice(0, 2).join(' · ')} + ${items.length - 2} weitere`;
   }
 
   function openDatePicker(input: HTMLInputElement) {
@@ -114,7 +129,7 @@
       const response = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ teams, startDate, endDate, tournament, existingPackageIds })
+        body: JSON.stringify({ teams, startDate, endDate, tournaments: selectedTournaments, existingPackageIds })
       });
       const data = (await response.json()) as OptimizationResult & { message?: string };
       if (!response.ok) throw new Error(data.message ?? 'Die Optimierung ist fehlgeschlagen.');
@@ -168,11 +183,19 @@
         </fieldset>
 
         <fieldset class="tournament-fieldset">
-          <legend>Turnier</legend>
-          <select bind:value={tournament} onchange={changeTournament} aria-label="Turnier auswählen">
-            <option value="">Alle Turniere</option>
-            {#each tournaments as item}<option value={item.name}>{item.name}</option>{/each}
-          </select>
+          <legend>Turniere</legend>
+          <details class="tournament-picker">
+            <summary><span>{selectedTournaments.length === 0 ? 'Alle Turniere' : `${selectedTournaments.length} Turniere ausgewählt`}</span><i>⌄</i></summary>
+            <div class="tournament-options">
+              <button class:active={selectedTournaments.length === 0} type="button" onclick={clearTournaments}>Alle Turniere</button>
+              {#each tournaments as item}
+                <label class:selected={selectedTournaments.includes(item.name)}>
+                  <input type="checkbox" checked={selectedTournaments.includes(item.name)} onchange={() => toggleTournament(item.name)} />
+                  <span><strong>{item.name}</strong><small>{formatDate(item.start)} bis {formatDate(item.end)}</small></span>
+                </label>
+              {/each}
+            </div>
+          </details>
         </fieldset>
 
         <fieldset class="existing-fieldset">
@@ -214,7 +237,7 @@
   {#if result && recommendedOption}
     <section class="results" id="ergebnis">
       <div class="section-heading">
-        <div><span class="kicker dark">Dein persönlicher Streaming Check</span><h2>{result.games.length === 0 ? 'Keine Spiele gefunden' : 'Das ist deine günstigste Kombination'}</h2><p>{result.teams.join(' · ')} · {result.tournament ?? 'Alle Turniere'} · Live · {formatDate(result.dateRange.start)} bis {formatDate(result.dateRange.end)}</p></div>
+        <div><span class="kicker dark">Dein persönlicher Streaming Check</span><h2>{result.games.length === 0 ? 'Keine Spiele gefunden' : 'Das ist deine günstigste Kombination'}</h2><p>{result.teams.join(' · ')} · {tournamentLabel(result.tournaments)} · Live · {formatDate(result.dateRange.start)} bis {formatDate(result.dateRange.end)}</p></div>
         <span class="runtime">Berechnet in {result.durationMs.toLocaleString('de-DE')} ms</span>
       </div>
 
@@ -223,7 +246,7 @@
           <span aria-hidden="true">!</span>
           <div>
             <strong>Für diese Filterkombination enthält der Datensatz keine Spiele.</strong>
-            <p>Geprüft wurden <b>{result.teams.join(', ')}</b> im Zeitraum <b>{formatDate(result.dateRange.start)} bis {formatDate(result.dateRange.end)}</b>{result.tournament ? ` im Turnier ${result.tournament}` : ' in allen Turnieren'}.</p>
+            <p>Geprüft wurden <b>{result.teams.join(', ')}</b> im Zeitraum <b>{formatDate(result.dateRange.start)} bis {formatDate(result.dateRange.end)}</b>{result.tournaments.length > 0 ? ` in den Turnieren ${result.tournaments.join(', ')}` : ' in allen Turnieren'}.</p>
             <p class="debug-info">Diagnose: 0 Spiele gefunden · Ändere den Zeitraum, wähle „Alle Turniere“ oder prüfe ein anderes Team.</p>
           </div>
         </div>
@@ -303,7 +326,7 @@
 {#if teams.length > 0}
   <button class="chat-fab" style={`--footer-offset: ${chatFabFooterOffset}px`} type="button" onclick={() => (chatOpen = true)} aria-label="Streaming-Berater öffnen"><span>◌</span><div><strong>Fragen zum Ergebnis?</strong><small>Streaming-Berater öffnen</small></div></button>
 {/if}
-<ChatPanel open={chatOpen} {teams} {startDate} {endDate} {tournament} {existingPackageIds} onclose={() => (chatOpen = false)} onteams={replaceTeams} />
+<ChatPanel open={chatOpen} {teams} {startDate} {endDate} tournaments={selectedTournaments} {existingPackageIds} onclose={() => (chatOpen = false)} onteams={replaceTeams} />
 
 <style>
   :global(*) { box-sizing: border-box; }
@@ -348,8 +371,8 @@
   legend { margin-bottom: .55rem; color: #243b53; font-size: .86rem; font-weight: 800; }
   .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
   .date-grid label { color: #627d98; font-size: .68rem; font-weight: 700; }
-  .date-grid input, .package-select select, .tournament-fieldset select { display: block; width: 100%; min-height: 2.8rem; margin-top: .25rem; padding: .55rem .65rem; border: 1px solid #cbd9e8; border-radius: 9px; background: #fff; color: #243b53; font: inherit; font-size: .78rem; outline: none; }
-  .date-grid input:focus, .package-select select:focus, .tournament-fieldset select:focus { border-color: #0874d1; box-shadow: 0 0 0 3px rgba(8,116,209,.1); }
+  .date-grid input, .package-select select { display: block; width: 100%; min-height: 2.8rem; margin-top: .25rem; padding: .55rem .65rem; border: 1px solid #cbd9e8; border-radius: 9px; background: #fff; color: #243b53; font: inherit; font-size: .78rem; outline: none; }
+  .date-grid input:focus, .package-select select:focus { border-color: #0874d1; box-shadow: 0 0 0 3px rgba(8,116,209,.1); }
   .date-input { position: relative; display: block; margin-top: .25rem; }
   .date-input input { margin-top: 0; padding-right: 2.8rem; appearance: none; -webkit-appearance: none; -moz-appearance: textfield; }
   .date-input input::-webkit-calendar-picker-indicator { display: none; -webkit-appearance: none; }
@@ -357,7 +380,22 @@
   .date-input button:hover { background: #e8f4ff; }
   .date-input button:focus-visible { outline: 2px solid #0874d1; outline-offset: 1px; }
   .date-input svg { width: 1.15rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
-  .tournament-fieldset select { margin-top: 0; }
+  .tournament-picker { position: relative; }
+  .tournament-picker > summary { display: flex; min-height: 2.8rem; align-items: center; justify-content: space-between; gap: .6rem; padding: .55rem .65rem; border: 1px solid #cbd9e8; border-radius: 9px; background: #fff; color: #243b53; font-size: .78rem; list-style: none; cursor: pointer; }
+  .tournament-picker > summary::-webkit-details-marker { display: none; }
+  .tournament-picker > summary i { color: #829ab1; font-style: normal; transition: transform .2s; }
+  .tournament-picker[open] > summary { border-color: #0874d1; box-shadow: 0 0 0 3px rgba(8,116,209,.1); }
+  .tournament-picker[open] > summary i { transform: rotate(180deg); }
+  .tournament-options { max-height: 14rem; margin-top: .4rem; overflow: auto; border: 1px solid #d7e3ef; border-radius: 9px; background: #fff; box-shadow: 0 10px 24px rgba(16,42,67,.12); }
+  .tournament-options > button { width: 100%; padding: .65rem .75rem; border: 0; border-bottom: 1px solid #e8eef5; background: #f7fafc; color: #486581; font-size: .72rem; font-weight: 800; text-align: left; cursor: pointer; }
+  .tournament-options > button.active { color: #0874d1; }
+  .tournament-options label { display: flex; align-items: center; gap: .6rem; padding: .55rem .75rem; border-bottom: 1px solid #edf2f7; cursor: pointer; }
+  .tournament-options label:last-child { border-bottom: 0; }
+  .tournament-options label:hover, .tournament-options label.selected { background: #f0f7fd; }
+  .tournament-options input { flex: 0 0 auto; accent-color: #0874d1; }
+  .tournament-options label span, .tournament-options label strong, .tournament-options label small { display: block; }
+  .tournament-options label strong { color: #334e68; font-size: .72rem; }
+  .tournament-options label small { margin-top: .1rem; color: #829ab1; font-size: .61rem; }
   .package-select { display: block; }
   .package-select select { margin: 0; min-width: 0; }
   .owned-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .6rem; }

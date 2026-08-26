@@ -153,14 +153,15 @@ export function teamsExist(teams: string[]): boolean {
   return teams.every((team) => available.has(team));
 }
 
-export function getGamesForTeams(teams: string[], startDate?: string, endDate?: string, tournament?: string): Game[] {
+export function getGamesForTeams(teams: string[], startDate?: string, endDate?: string, tournaments: string[] = []): Game[] {
   if (teams.length === 0) return [];
   const placeholders = teams.map(() => '?').join(', ');
+  const uniqueTournaments = [...new Set(tournaments)];
   const dateFilter = startDate && endDate ? 'AND starts_at >= ? AND starts_at <= ?' : '';
-  const tournamentFilter = tournament ? 'AND tournament_name = ?' : '';
+  const tournamentFilter = uniqueTournaments.length > 0 ? `AND tournament_name IN (${uniqueTournaments.map(() => '?').join(', ')})` : '';
   const parameters: Array<string> = [...teams, ...teams];
   if (startDate && endDate) parameters.push(`${startDate} 00:00:00`, `${endDate} 23:59:59`);
-  if (tournament) parameters.push(tournament);
+  parameters.push(...uniqueTournaments);
   const rows = getDb()
     .prepare(`
       SELECT id, team_home, team_away, starts_at, tournament_name
@@ -202,8 +203,9 @@ export function getTournamentRanges(): Array<{ name: string; start: string; end:
   return rows.map((row) => ({ name: row.name, start: row.start.slice(0, 10), end: row.end.slice(0, 10) }));
 }
 
-export function tournamentExists(tournament: string): boolean {
-  return listTournaments().includes(tournament);
+export function tournamentsExist(tournaments: string[]): boolean {
+  const available = new Set(listTournaments());
+  return tournaments.every((tournament) => available.has(tournament));
 }
 
 export function getDataBounds(): { start: string; end: string } {

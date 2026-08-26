@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { answerQuestion } from '$lib/server/chat';
-import { getDataBounds, packagesExist, teamsExist, tournamentExists } from '$lib/server/db';
+import { getDataBounds, packagesExist, teamsExist, tournamentsExist } from '$lib/server/db';
 
 export async function POST({ request }) {
   const body = (await request.json()) as {
@@ -9,7 +9,7 @@ export async function POST({ request }) {
     startDate?: unknown;
     endDate?: unknown;
     existingPackageIds?: unknown;
-    tournament?: unknown;
+    tournaments?: unknown;
   };
   if (typeof body.message !== 'string' || body.message.trim().length === 0 || body.message.length > 1_000) {
     error(400, 'Die Nachricht muss zwischen 1 und 1.000 Zeichen lang sein.');
@@ -30,7 +30,11 @@ export async function POST({ request }) {
   }
   const existingPackageIds = [...new Set(rawExistingPackageIds as number[])];
   if (!packagesExist(existingPackageIds)) error(400, 'Mindestens ein vorhandenes Paket ist unbekannt.');
-  const tournament = typeof body.tournament === 'string' && body.tournament.trim() ? body.tournament.trim() : undefined;
-  if (tournament && !tournamentExists(tournament)) error(400, 'Das ausgewählte Turnier ist unbekannt.');
-  return json(await answerQuestion(body.message.trim(), teams, { startDate, endDate, existingPackageIds, tournament }));
+  const rawTournaments = body.tournaments ?? [];
+  if (!Array.isArray(rawTournaments) || rawTournaments.some((tournament) => typeof tournament !== 'string')) {
+    error(400, 'Ungültige Turnierauswahl.');
+  }
+  const tournaments = [...new Set(rawTournaments.map((tournament) => tournament.trim()).filter(Boolean))];
+  if (!tournamentsExist(tournaments)) error(400, 'Mindestens ein ausgewähltes Turnier ist unbekannt.');
+  return json(await answerQuestion(body.message.trim(), teams, { startDate, endDate, existingPackageIds, tournaments }));
 }

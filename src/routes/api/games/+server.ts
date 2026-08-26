@@ -9,9 +9,9 @@ export function GET({ url }) {
 
   const startDate = url.searchParams.get('start') ?? undefined;
   const endDate = url.searchParams.get('end') ?? undefined;
-  const tournament = url.searchParams.get('tournament') ?? undefined;
+  const tournaments = url.searchParams.getAll('tournament').map((tournament) => tournament.trim()).filter(Boolean);
 
-  const games = getGamesForTeams([...new Set(teams)], startDate, endDate, tournament);
+  const games = getGamesForTeams([...new Set(teams)], startDate, endDate, tournaments);
   const offers = getOffers(games.map((game) => game.id));
   const packages = getPackages();
   return json({ games, offers, packages });

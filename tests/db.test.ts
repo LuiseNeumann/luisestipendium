@@ -20,12 +20,22 @@ describe('CSV-Datenbank', () => {
       ['Deutschland'],
       '2024-06-01',
       '2024-07-31',
-      'Europameisterschaft 2024'
+      ['Europameisterschaft 2024']
     );
 
     expect(listTournaments()).toContain('Europameisterschaft 2024');
     expect(games.length).toBeGreaterThan(0);
     expect(games.every((game) => game.tournament === 'Europameisterschaft 2024')).toBe(true);
+  });
+
+  it('filtert nach mehreren Turnieren gleichzeitig', () => {
+    const selected = ['Bundesliga 24/25', 'UEFA Champions League 24/25'];
+    const games = getGamesForTeams(['Bayern München'], '2024-08-01', '2025-05-31', selected);
+    const foundTournaments = new Set(games.map((game) => game.tournament));
+
+    expect(games.length).toBeGreaterThan(0);
+    expect(games.every((game) => selected.includes(game.tournament))).toBe(true);
+    expect(foundTournaments).toEqual(new Set(selected));
   });
 
   it('liefert für jedes Turnier den tatsächlichen Spielzeitraum', () => {

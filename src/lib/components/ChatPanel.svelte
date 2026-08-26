@@ -3,7 +3,7 @@
   export let teams: string[] = [];
   export let startDate: string;
   export let endDate: string;
-  export let tournament = '';
+  export let tournaments: string[] = [];
   export let existingPackageIds: number[] = [];
   export let onclose: () => void;
   export let onteams: (teams: string[]) => void;
@@ -23,7 +23,7 @@
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message, teams, startDate, endDate, tournament, existingPackageIds })
+        body: JSON.stringify({ message, teams, startDate, endDate, tournaments, existingPackageIds })
       });
       const data = (await response.json()) as {
         answer?: string;

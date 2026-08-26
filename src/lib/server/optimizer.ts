@@ -31,7 +31,7 @@ export interface OptimizeInput {
   startDate: string;
   endDate: string;
   existingPackageIds: number[];
-  tournament?: string;
+  tournaments?: string[];
 }
 
 let glpkPromise: Promise<GlpkInstance> | undefined;
@@ -215,7 +215,7 @@ async function findAlternatives(
 
 export async function optimizeForTeams(teams: string[], input: OptimizeInput): Promise<OptimizationResult> {
   const startedAt = performance.now();
-  const games = getGamesForTeams(teams, input.startDate, input.endDate, input.tournament);
+  const games = getGamesForTeams(teams, input.startDate, input.endDate, input.tournaments);
   const packages = getPackages();
   const packageById = new Map(packages.map((item) => [item.id, item]));
   const ownedPackages = new Set(input.existingPackageIds);
@@ -402,7 +402,7 @@ export async function optimizeForTeams(teams: string[], input: OptimizeInput): P
   return {
     teams,
     dateRange: { start: input.startDate, end: input.endDate },
-    tournament: input.tournament ?? null,
+    tournaments: input.tournaments ?? [],
     existingPackageIds: input.existingPackageIds,
     games,
     unavailableGameIds,
