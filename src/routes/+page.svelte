@@ -329,7 +329,15 @@
       </div>
 
       {#if result.unavailableGameIds.length > 0}
-        <div class="notice">Für {result.unavailableGameIds.length} {result.unavailableGameIds.length === 1 ? 'Spiel liegt' : 'Spiele liegen'} im Datensatz kein passendes Live-Angebot vor. Diese Spiele fließen nicht in die Kostenoptimierung ein.</div>
+        <div class="notice">
+          <p>Für {result.unavailableGameIds.length} {result.unavailableGameIds.length === 1 ? 'Spiel liegt' : 'Spiele liegen'} im Datensatz kein passendes Live-Angebot vor. {result.unavailableGameIds.length === 1 ? 'Dieses Spiel fließt' : 'Diese Spiele fließen'} nicht in die Kostenoptimierung ein.</p>
+          <ul>
+            {#each result.unavailableGameIds as gameId}
+              {@const game = gameById.get(gameId)}
+              {#if game}<li><strong>{game.homeTeam} – {game.awayTeam}</strong><span>{formatDate(game.startsAt)} · {game.tournament}</span></li>{/if}
+            {/each}
+          </ul>
+        </div>
       {/if}
 
       <div class="plan-grid">
@@ -516,6 +524,11 @@
   .bar { height: .65rem; margin: .7rem 0; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.18); }
   .bar i { display: block; height: 100%; min-width: .65rem; border-radius: inherit; background: #ffb514; }
   .notice { margin-bottom: 1.5rem; padding: .85rem 1rem; border-left: 4px solid #f5a000; border-radius: 8px; background: #fff7e3; color: #70510a; font-size: .79rem; line-height: 1.5; }
+  .notice p { margin: 0; }
+  .notice ul { display: grid; max-height: 12rem; margin: .7rem 0 0; padding: .65rem 0 0; overflow: auto; border-top: 1px solid #efd78f; gap: .4rem; list-style: none; }
+  .notice li { display: flex; justify-content: space-between; gap: 1rem; padding-right: .4rem; }
+  .notice li strong { color: #4f3b08; }
+  .notice li span { flex: 0 0 auto; color: #80691f; font-size: .7rem; }
   .no-games-diagnostic { display: flex; max-width: 60rem; align-items: flex-start; gap: 1rem; padding: 1.4rem; border: 1px solid #f1cf7a; border-radius: 14px; background: #fff9e9; color: #5d4916; }
   .no-games-diagnostic > span { display: grid; flex: 0 0 auto; width: 2.2rem; height: 2.2rem; place-items: center; border-radius: 50%; background: #f5a000; color: #382b08; font-weight: 900; }
   .no-games-diagnostic strong { color: #3f310b; font-size: 1rem; }
@@ -603,6 +616,7 @@
     .savings-banner { grid-template-columns: 1fr; }
     .saving-main { grid-column: auto; }
     .saving-compare { padding: 1.25rem; }
+    .notice li { align-items: flex-start; flex-direction: column; gap: 0; }
     .plan-grid { grid-template-columns: 1fr; }
     .subheading { align-items: flex-start; flex-direction: column; gap: .4rem; }
     .free-grid { grid-template-columns: 1fr; }
