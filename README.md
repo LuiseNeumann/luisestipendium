@@ -2,6 +2,9 @@
 
 Streaming Check ermittelt für bis zu acht ausgewählte Fußballmannschaften und einen frei wählbaren Zeitraum die günstigste Kombination aus Live-Streaming-Paketen. Die Anwendung vergleicht eine statische Jahresstrategie mit einer zeitlich gestaffelten Buchung und erklärt jeden Preisbestandteil.
 
+## Visualisierung
+Ein Video zur Funktionsweise der App befindet sich in dem Repo "check_25MB.mp4". 
+
 ## Schnellstart
 
 Voraussetzungen: Node.js 22 oder Docker.
@@ -139,3 +142,6 @@ Ergibt die Kombination aus Teams, Zeitraum und Turnieren keine Spiele, zeigt die
 ## Noch außerhalb des Umfangs
 
 Die optionalen Ideen Haushaltsmodus, ICS-Export, Was-wäre-wenn-Regler und Sprachsteuerung sind nicht Bestandteil dieser ersten vollständigen Ausbaustufe. Zahlungsabwicklung und Vertragsabschluss sind bewusst ausgeschlossen.
+
+## weitere Anmerkungen 
+Aufgrund von technischen Herausforderungen wurde ein teil des Projektes auf einem anderen PC bearbeitet, wo ein anderer Github Account hinterlegt war.
